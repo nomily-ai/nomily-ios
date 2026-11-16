@@ -3,7 +3,7 @@
 Native iOS companion for Vobot V05E and Apple Watch recording workflows. It
 connects to V05E over BLE, manages recordings, and runs ASR (Azure, local
 Whisper, or fully on-device). Project overview and licence:
-[nomily-app](https://github.com/Nomily-Ai/nomily-app).
+[nomily-app](https://github.com/nomily-ai/nomily-app).
 
 ## Supported devices
 
