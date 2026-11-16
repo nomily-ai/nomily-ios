@@ -2,14 +2,6 @@ import MessageUI
 import SwiftUI
 import UIKit
 
-/// Email export with attachment picker (★ 2026-10-22, 任务二).
-///
-/// Plaud ships this as the workflow action
-/// `Workflow_send_email_attachments_{summary|transcription|mindmap}` —
-/// "send email with the summary / the transcript / the mind map" is a proven
-/// high-frequency path, so the composer offers exactly those three (greyed
-/// out when the artefact doesn't exist). Only the design intent is copied;
-/// wording and layout are Nomily's own.
 struct MailExportSheet: View {
     let clipName: String
     @Environment(\.dismiss) private var dismiss

@@ -4,17 +4,6 @@ import SwiftUI
 // 凭据归一化属于传输层，不放 UI 文件，免得只有这一条路记得清洗。
 
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.3 存储分层 · WebDAV 目的地）
-///
-/// ★ 2026-11-09 多账户改版（用户："选择 nas 或者其他都是用的同一个，没有区分
-/// 每个品牌跟配置，都是点击出现的 NC 的配置"）：旧版只有一个 `webdav` 槽位，
-/// 弹层里选哪个品牌都只是"给同一条配置换皮"——已配过 Nextcloud 时，点群晖
-/// 进去看到的还是 NC 的主机和账号，保存还会把 NC 覆盖掉。
-/// 现在弹层分两段：
-///   · **已保存的服务器** —— 每条账户独立编辑（各自的主机/账号/密码），
-///     标「使用中」的是自动备份目标；左滑可删。
-///   · **添加服务器** —— 按品牌预填端口/HTTPS/目录，新建一条账户，
-///     保存后自动成为「使用中」。
 struct WebDAVSetupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var configService: ConfigService
@@ -148,10 +137,6 @@ private extension Array {
     }
 }
 
-/// 预设的唯一数据源：弹层与配置页共用（标签/端口/HTTPS/占位符/引导文案 + 弹层图标）。
-/// ★ 2026-10-30（用户："nas 的名称需要把他们的 APP 图标附带上"）：`appIcon` 是
-/// 从 App Store 拿到的各家官方 App 图标（Assets 里的 imageset，512px 原图缩到
-/// 180px）；`其他 WebDAV` 没有品牌，回退到 SF Symbol。
 enum WebDAVPresets {
     struct Item {
         let label: String
@@ -208,8 +193,6 @@ struct WebDAVView: View {
     @ObservedObject private var sync = WebDAVSyncService.shared
     @Environment(\.dismiss) private var dismiss
 
-    /// ★ 2026-10-30（用户："归纳到一个 webdav，点击按照类型选择，在弹页面设置"）：
-    /// 从 WebDAVSetupSheet 选完类型跳进来时带上预设；已有配置时忽略（以配置为准）。
     var initialPreset: String? = nil
 
     /// ★ 2026-11-09 多账户：非 nil = 编辑已保存的某一条账户（按 id 从
@@ -224,8 +207,6 @@ struct WebDAVView: View {
     /// Form-local editable copy — committed to config on save, password lives
     /// in the Keychain via ConfigService's strip/restore.
     @State private var host = ""
-    /// ★ 2026-10-30（用户："端口要支持输入而不是+−这样方式"）：从 Stepper 改成
-    /// 纯文本框——NAS 用户手里拿的是现成端口号（5005/5006/9443…），加减点不到位。
     @State private var portText = "443"
     @State private var useHTTPS = true
     /// ★ 2026-10-30（极空间 HTTPS 5006 实测自签证书）：信任自签的开关。
@@ -234,7 +215,6 @@ struct WebDAVView: View {
     @State private var password = ""
     @State private var basePath = "/nomily"
     @State private var syncAudio = false
-    /// ★ 2026-11-09（用户："可以选择上传哪些"）：这个目的地传哪些产物。
     @State private var upload = UploadContent()
     @State private var preset = ""
 
@@ -243,8 +223,6 @@ struct WebDAVView: View {
     /// ★ 2026-11-02（用户拿分享链接当 WebDAV 地址）：粘贴的是网页分享链接
     ///   （`/f/<id>`、`/s/<token>`）时给出纠正引导，而不是默默存一条必挂的配置。
     @State private var pasteNote: String?
-    /// ★ 2026-11-02（用户："上传指定文件夹需要有选择而不固定"）：服务器文件夹
-    ///   浏览选择器。
     @State private var showingFolderPicker = false
 
     /// `portText` → 有效端口；非法（空/越界）返回 nil，由调用方报错。
@@ -259,12 +237,6 @@ struct WebDAVView: View {
         WebDAVPresets.item(named: preset)?.hostPlaceholder ?? L10n.WebDAV.host
     }
 
-    /// ★ 2026-10-30（用户："同步到 Nextcloud 这个需要优化一下，他不是本地的
-    ///   局域网，需要增加引导跟对应设置"）：Nextcloud 是公网服务，WebDAV 根
-    ///   永远带用户名（`/remote.php/dav/files/<用户名>/`）——这是新手最容易卡死
-    ///   的一步（填错就 404/401，且报错看不出原因）。所以选了 Nextcloud 就
-    ///   **不显示目录框**，路径由用户名自动推导；老配置里已手填过 remote.php
-    ///   路径的仍然尊重原值。
     private var isNextcloud: Bool { preset == "Nextcloud" }
 
     /// 实际生效的服务器目录：Nextcloud 自动推导，其余照旧。
@@ -282,10 +254,6 @@ struct WebDAVView: View {
 
     var body: some View {
         Form {
-            // ★ 2026-10-30（用户："在服务器类型选择了对应的设备里面就不要设置
-            //   服务商可以选择了"）：类型选择只发生在弹层里，进到本页不再出现
-            //   「服务商」Picker——预设的端口/HTTPS/目录在 load() 里按 initialPreset
-            //   预填，品牌提示挪到连接区的 footer。
 
             Section {
                 TextField(hostPlaceholder, text: $host)
@@ -307,10 +275,6 @@ struct WebDAVView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 SecureField(L10n.WebDAV.password, text: $password)
-                // ★ 2026-11-02（用户："上传指定文件夹需要有选择而不固定"）：
-                //   目录统一「可看可改可浏览」——Nextcloud 显示推导结果并提供
-                //   「恢复自动」，其余服务商保留手输框；所有类型都能点
-                //   「在服务器上选择…」进文件夹浏览弹层。
                 if isNextcloud {
                     HStack {
                         Text(effectiveBasePath)
@@ -339,10 +303,6 @@ struct WebDAVView: View {
             } header: {
                 Text(L10n.WebDAV.connection)
             } footer: {
-                // 品牌引导文案跟着预设走（原来挂在已删除的服务商 Picker 下面）。
-                // ★ 2026-11-02（用户："需要增加引导如何获取对应的账号密码而不是
-                // 登录密码之类的"）：凭据引导统一放在品牌提示**前面**——用户先
-                // 看到账号密码去哪拿，再看品牌细节。
                 VStack(alignment: .leading, spacing: 6) {
                     Label {
                         Text(L10n.WebDAV.credentialGuide)
@@ -350,7 +310,7 @@ struct WebDAVView: View {
                         Image(systemName: "person.text.rectangle")
                     }
                     if isNextcloud {
-                        Text("目录默认是 /remote.php/dav/files/你的用户名/Nomily/，可以点「在服务器上选择文件夹」换成任意已有目录。" + L10n.WebDAV.basePathFooter)
+                        Text(L10n.WebDAV.nextcloudPathHint + L10n.WebDAV.basePathFooter)
                     } else if let hint = WebDAVPresets.item(named: preset)?.hint {
                         Text(hint + "\n\n" + L10n.WebDAV.basePathFooter)
                     } else {
@@ -359,7 +319,6 @@ struct WebDAVView: View {
                 }
             }
 
-            // ★ 2026-11-02：粘贴了分享链接时的即时纠正（见 pasteNote）。
             if let note = pasteNote {
                 Section {
                     Label {
@@ -417,8 +376,6 @@ struct WebDAVView: View {
                 Text(L10n.WebDAV.syncNowFooter)
             }
 
-            // ★ 2026-11-09（用户："可以选择上传哪些"）：这个目的地传哪些产物。
-            //   录音是上面那条「也传录音」开关（它决定要不要拖带宽）。
             Section {
                 Toggle(L10nUploadContent.transcript, isOn: $upload.transcript)
                 Toggle(L10nUploadContent.asr, isOn: $upload.asrJSON)
@@ -461,7 +418,6 @@ struct WebDAVView: View {
                 }
             }
 
-            // ★ 2026-10-29 (饭耳移植 · 规格 #10): one privacy sentence per page.
             Section {
                 PrivacyNote(flavor: .backup)
             }
@@ -645,18 +601,14 @@ struct WebDAVView: View {
     ///   · `/remote.php/dav/files/<用户名>/` → 用户名直接回填（Nextcloud 客户端
     ///     复制的 WebDAV 地址就是这个形状），目录走自动推导，不用动；
     ///   · `/remote.php/webdav…`（旧版端点）→ 目录原样保留；
-    ///   · 其他路径（坚果云 /dav、群晖 /home 等）→ 目录原样保留；
-    ///   · `/` → 没有信息，忽略。
-    /// ★ 2026-11-02（用户实测踩到）：`/f/<数字>`、`/s/<token>`、`/d/<…>` 是
-    ///   Nextcloud 的**网页分享/文件页**链接，不是 WebDAV 端点——拿它当地址
-    ///   测试只会得到 401/404。识别出来给纠正引导，目录保持原值不动。
+    /// Detect browser sharing URLs so they are not used as WebDAV endpoints.
     private static let sharePathRegex = try? NSRegularExpression(
         pattern: #"^/(f|s|d)/[A-Za-z0-9._-]+/?$"#)
 
     private func applyPastedPath(_ path: String) {
         if let re = Self.sharePathRegex,
            re.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)) != nil {
-            pasteNote = "你粘贴的是网页分享链接，不是 WebDAV 地址。主机只填域名（如 doc.oazon.com），用户名填你的账号，密码用「应用密码」——目录会自动生成，不需要这条链接。"
+            pasteNote = L10n.WebDAV.pastedShareLink
             return
         }
         pasteNote = nil
@@ -711,10 +663,6 @@ struct WebDAVView: View {
         }
 
         var basePath = effectiveBasePath
-        // ★ 2026-10-30（用户："点击测试链接极空间提示 401"）：极空间的个人空间
-        //   目录名是 `/sata<卷>-<账号>/`，猜不出来。目录还停在默认值时先扫根目录
-        //   自动定位——不限服务商，反正根上没有 sata 命名就返回 nil。
-        //   Nextcloud 的路径已在 effectiveBasePath 推导好，跳过这个分支。
         if !isNextcloud, basePath == "/nomily",
            let space = await make("/").discoverPersonalSpace(username: trimmedUser) {
             basePath = space + "/nomily"
@@ -753,10 +701,6 @@ struct WebDAVView: View {
     }
 }
 
-/// ★ 2026-11-02（用户："上传指定文件夹需要有选择而不固定"）：服务器文件夹
-/// 浏览选择器。PROPFIND Depth 1 逐层下钻，「使用这个目录」提交给表单。
-/// client 由表单当前值构建——换了主机/账号先回车提交再进来
-/// （`prepareFolderPicker` 已做端点拆分），弹层里只管浏览。
 private struct WebDAVFolderPicker: View {
     let client: WebDAVClient
     let initialPath: String

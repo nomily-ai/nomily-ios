@@ -4,24 +4,6 @@ import UserNotifications
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "timed-rec")
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §3.1 定时录音 · 按时间录）
-/// ★ 2026-10-30 重写（用户："定时录音应该是归纳到 Apple Watch 上面，只对
-/// 这个设备有效……真正在手表上录"）：
-///
-/// 调度器不再动手机麦克风。窗口内到点，通过 WatchConnectivity 的
-/// application context 让 **手表** 开始录音；窗口结束让手表停。手表的片段
-/// 走既有管线自动传回手机入库转写（`WatchLink.transferFile` → 手机
-/// `recordDownload` → 自动转写），所以这里不需要保存任何文件。
-///
-/// 平台现实，照旧直说：
-///   · **自动触发只在手机进程活着时生效**（启动 / 回前台 / 30 秒心跳时评估；
-///     窗口开始时进程死了，就在下一次窗口内评估时补发 start——录个后半夜）。
-///   · **手表麦克风只在 App 前台可用。** 命令经 application context 转交，
-///     不需要手表此刻可达；手表把命令存着，抬腕进 App 时补开录。抬腕了但
-///     始终没录上（120 秒内表端心跳仍说没在录），发本地通知提醒用户。
-///   · **手机死机也有兜底**：start 命令里带着窗口结束时刻，手表到点自己停。
-///   · 发出 start 后 `BackgroundKeeper(.timedRecording)` 照旧挂着——它现在的
-///     职责是保住"到点能发 stop"这条命。
 @MainActor
 final class TimedRecordingScheduler: ObservableObject {
 
@@ -76,10 +58,6 @@ final class TimedRecordingScheduler: ObservableObject {
             return
         }
 
-        // ★ 2026-11-02（用户："例如一直录，跟设置一个时间段录制"）：一直录
-        // 模式不分窗口——开开关立即开录，关开关才停。兜底 endsAt 顺延到
-        // +24h：手表到点自己停后，心跳发现表端没在录且已超 24h，重发 start，
-        // 形成"只要开关开着就持续在录"的滚动续期。
         if cfg.timedRecordingAlwaysOn {
             if startIssuedAt == nil {
                 issueStart(endsAt: Date().addingTimeInterval(86_400))
@@ -212,6 +190,3 @@ final class TimedRecordingScheduler: ObservableObject {
         UNUserNotificationCenter.current().add(request)
     }
 }
-
-/// ★ 2026-10-30：HealthKit 睡眠预填已移除（用户："健康功能不是我们的赛道"）。
-/// 定时窗口只用手填的开始/结束时间。

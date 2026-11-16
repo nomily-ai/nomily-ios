@@ -97,12 +97,6 @@ enum BotFaceStyle: String, CaseIterable, Codable, Identifiable {
     case wink
     /// Love. Heart-shaped pupils — borrowed from agent-avatars' `love` mood.
     case love
-    // ★ 2026-11-06 二轮（用户："表情库很丰富他们里面我们没有就加入进来"）：
-    // 把 agent-avatars 库里还缺的静态档补齐。thinking / listening / searching /
-    // reading / writing 是**行为**（视线姿态 / 扫视），由 `runGazeLoop` 的姿态
-    // 抽签承担，不进静态库（理由见上面 wink 处的段落）；working 的转圈眼睛
-    // 在手表上是持续动画，常驻太闹，同样不进。
-    /// Sorry（借鉴 `sorry` mood）：眼皮下垂、眉心内收——任务失败时那张脸。
     case sorry
     /// Confused（借鉴 `confused` mood）：两眼一高一矮、同向倾斜——"歪头"。
     /// 原项目里两眼还会持续交换大小；静态档先取它的"歪斜不对称"姿态，
@@ -293,29 +287,8 @@ enum BotFaceArc {
 ///   the eye is in the preview" must be **the same formula** as "how big it is on the watch", otherwise
 ///   what the user picks and what they see on the device would be out of proportion.
 enum BotFaceMetrics {
-    /// Width of the idle eye.
-    ///
-    /// ★ 2026-11-03（用户："首页的眼睛部分变得很小"）：对齐 V4 原型
-    /// `54px / 226px = 0.239`。旧值 0.235 本来就贴着原型，问题不在宽。
-    /// ★★ 2026-11-03 七轮（用户："眼睛这个优化有问题，没有按照之前那种大一点的比例"）：
-    ///   0.26 → **0.30**，眼高 0.55 → **0.62**。原型（0.239/0.496）在这个尺寸的表上
-    ///   偏保守，用户明显要"更大一号"，这里按 1.25 倍放大原型比例。
     static func eyeWidth(_ size: CGFloat) -> CGFloat { size * 0.30 }
-    /// Height of the idle eye.
-    ///
-    /// ★ 2026-11-03（用户："首页的眼睛部分变得很小"）：**这里是主要病灶**——
-    /// 旧值 0.375 只有原型（`112px / 226px = 0.496`）的四分之三，眼睛是一对"矮墩"。
-    /// 对齐到 0.50：眼从扁圆变回原型那对竖长的白条（Grok bot 的比例）。
-    /// ★★ 2026-11-03 五轮：0.50 → **0.55**（用户仍嫌小）；七轮再 → **0.62**。
-    /// ⚠️ 表情库的弧形（`arcHeight/arcWidth`）都从眼高派生，会一起等比长高——
-    ///   手机预览与手表共用本文件，两端同步变化，不会漂。
     static func eyeHeight(_ size: CGFloat) -> CGFloat { size * 0.62 }
-    /// The gap **between** the two eyes (not the centre-to-centre distance).
-    ///
-    /// ★ 2026-11-03 八轮（用户："眼睛太近了，不够生动"）：0.11 → **0.17**。
-    ///   两眼总宽 2×0.30 + 0.17 = 0.77 × size，仍留在 1.14 的框内。
-    ///   ⚠️ 间距是"生不生动"的一半：Grok bot 那对眼睛之间明显留白，
-    ///   挨太近会读成一张"眯着的脸"。
     static func eyeGap(_ size: CGFloat) -> CGFloat { size * 0.17 }
     /// How much the pair of eyes is raised above the geometric centre. Dead centre makes it look like "head down" —
     /// a human face's eyes sit above the midpoint anyway.

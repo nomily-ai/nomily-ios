@@ -1,13 +1,6 @@
 import Foundation
 import os
 
-/// A tiny on-disk ledger of LLM model-list requests.
-///
-/// ★ 2026-11-04（用户："手机获取模型获取不到"）：出问题时手机在手，Mac 上看不到控制台，
-/// 「获取模型」又只回一句 HTTP 404——地址是谁拼的、带没带 key，全都无从判断。
-/// 这里把 method / host / path / 状态码 / 耗时 / 是否带 Authorization 写进
-/// `Documents/llm-requests.log`（`devicectl device copy from` 就能取出），
-/// 排查时不用再靠猜。**只记 path 与是否存在 key，绝不写 key 本身。**
 enum LLMRequestLog {
 
     private static let log = Logger(subsystem: "com.nomily.app", category: "LLM-Request")

@@ -86,10 +86,6 @@ struct LLMPreset: Identifiable, Equatable {
         note: "豆包由火山引擎方舟提供。模型一栏可以填模型名（doubao-…），也可以填推理接入点 ID（ep-… 开头，账号不能按名调用时用这种）。"
     )
 
-    // ★ 2026-10-29（用户："模型不要区分国内国外…图标将现在有的结合图片里面的都加入"）：
-    // 参照截图补齐 Kimi / 智谱 GLM / MiniMax 三家。Kimi 与智谱都是 OpenAI 兼容
-    // `/chat/completions`；MiniMax 的对话接口是它自家的 `/text/chatcompletion_v2`，
-    // 走不了通用 OpenAI 路径——所以它的"从服务商拉取"不可用，靠下面的精选模型列表。
     static let kimi = LLMPreset(
         id: "kimi",
         name: "Kimi",

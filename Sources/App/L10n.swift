@@ -36,8 +36,6 @@ enum L10n {
         static var cloudMessage: String { NSLocalizedString("privacy.cloud_message", value: "You've set up a cloud transcription or AI provider (e.g. Azure, OpenAI). Your audio and text are sent to that third-party service to be processed. Nothing goes to a Nomily server, but the data does leave your device. For fully on-device processing, use a local ASR server and a local (Ollama) or no AI model.", comment: "Cloud-egress consent body") }
         static var cloudAgree: String { NSLocalizedString("privacy.cloud_agree", value: "I Understand, Continue", comment: "") }
         static var cloudGoLocal: String { NSLocalizedString("privacy.cloud_go_local", value: "Provider Settings", comment: "") }
-        // ★ 2026-10-29 (饭耳移植 · 规格 #10 隐私话术系统化) — rendered by
-        // `PrivacyNote`; claims must match actual behaviour, see that file.
         static var storageNote: String { NSLocalizedString("privacy.storage", comment: "") }
         static var cloudNote: String { NSLocalizedString("privacy.cloud", comment: "") }
         static var backupNote: String { NSLocalizedString("privacy.backup", comment: "") }
@@ -177,15 +175,6 @@ enum L10n {
 
     // MARK: - Settings
 
-    /// PLAUD cloud sync (2026-10-21 dual-mode support).
-    /// 任务八 · 8.1 — "find my card", the pure-App half that needs no firmware.
-    ///
-    /// Copy rules baked into these strings:
-    /// · never promise a city-wide locator — BLE is 10–30 m, say so where the
-    ///   button is, not in a footnote;
-    /// · "beep" is offered but visibly disabled, with the reason in the row
-    ///   (the card has no buzzer command in its SDK at all — 8.2 waits on
-    ///   firmware, and a greyed row that explains itself beats a hidden one).
     enum Find {
         static var header: String {
             NSLocalizedString("find.header", value: "Find card",
@@ -688,8 +677,6 @@ enum L10n {
             NSLocalizedString("settings.usage_guide", value: "Usage guide",
                               comment: "Settings row: replay the first-launch walkthrough")
         }
-        /// ★ 2026-11-02（用户："开屏的欢迎页我如何才能再次体验"）：该行的副标题，
-        /// 明确它同时重播欢迎页。
         static var usageGuideDetail: String {
             NSLocalizedString("settings.usage_guide_detail", value: "Replay the welcome screen and the tour",
                               comment: "Settings row subtitle: replays the welcome sheet as well")
@@ -709,10 +696,6 @@ enum L10n {
                               comment: "Settings search footer: what is indexed")
         }
 
-        // ★ 2026-11-03（用户："设置的最上角增加一个横条…引导用户去购买 Vobot V05E"）：
-        // 设置页顶部的购买横幅。
-        // ★ 同日措辞修正（用户："要写最适配的录音卡硬件，而不是配套的——配套则是官方的 app"）：
-        //   「配套」会被读成"官方配对硬件"，实际卖点是"和本 App 最适配"。
         static var buyBannerTitle: String {
             NSLocalizedString("settings.buy_banner_title", value: "Vobot V05E Recorder Card",
                               comment: "Settings top banner: recommended hardware name")
@@ -794,7 +777,6 @@ enum L10n {
         static var statusPending: String {
             Bundle.systemString("consent.status.pending", value: "Not yet accepted")
         }
-        /// 手表端只有一句（用户："手表只放短提示"）。
         static var watchHint: String {
             Bundle.systemString(
                 "consent.watch.hint",
@@ -805,10 +787,6 @@ enum L10n {
 
     // MARK: - First-run guide (★ 2026-11-02, 流程式)
 
-    /// ★ 2026-11-02（用户："首次用户使用需要弹出用户引导…会展示三条示例介绍需要跟随
-    /// 当前语言切换进行切换"）：首启欢迎页——介绍三条示例，再交给流程式引导。
-    /// ★ 同日补充（用户："这个开屏需要跟随手机系统的语言进行设置"）：这一整套文案
-    /// **跟手机系统语言**、不跟 App 内语言选择——开屏发生在用户做任何选择之前。
     enum Welcome {
         // ★ 全部走 `Bundle.systemString`（系统语言），不走 `NSLocalizedString`——
         //   开屏要跟手机系统语言，见 `Bundle.systemLanguage` 的说明。
@@ -1199,14 +1177,14 @@ enum L10n {
         }
     }
 
-    // MARK: - Profile (称呼, 2026-10-28 · FanEar spec §3.2)
+    // MARK: - Profile
 
     enum Profile {
         static var userName: String {
             NSLocalizedString("profile.user_name", value: "Your Name for the AI", comment: "Settings row: how the AI addresses the user / labels their own speech")
         }
         static var userNamePlaceholder: String {
-            NSLocalizedString("profile.user_name_placeholder", value: "e.g. Angel", comment: "Placeholder in the user-name field")
+            NSLocalizedString("profile.user_name_placeholder", value: "e.g. Alex", comment: "Placeholder in the user-name field")
         }
         static var footer: String {
             NSLocalizedString("profile.footer", value: "Rides along with every AI summary: the model knows who the recording belongs to and can mark their own speech as “Name (me)”.",
@@ -1270,8 +1248,6 @@ enum L10n {
             String(format: NSLocalizedString("storage.file_count", comment: ""), n)
         }
 
-        // ★ 2026-10-30 二稿（用户："按照块状显示，设备与资料库，显示统计那个设备
-        // 记录时长还有手表的，多一点图表动效"）：块状卡片用到的文案。
         static var totalLabel: String {
             NSLocalizedString("storage.total_label", value: "Used across every location", comment: "Storage page: caption under the big total number")
         }
@@ -1345,9 +1321,6 @@ enum L10n {
         static var syncedBadge: String {
             NSLocalizedString("reminders.synced_badge", value: "Synced to Reminders", comment: "Small status line under a recording's to-do list")
         }
-        /// ★ 2026-10-30（用户："同步到手机待办这个是同步到手机的提醒事项方便查看需要做的事情"）：
-        /// 待办列表底部的常驻说明——不是"刚才新建了几条"的瞬时提示，而是告诉用户
-        /// **去哪儿能看到还剩什么要做**。
         static var listFooter: String {
             NSLocalizedString("reminders.list_footer",
                               value: "These to-dos are in the iPhone Reminders app — open Reminders to see what's left.",
@@ -1407,7 +1380,6 @@ enum L10n {
         static var autoTag: String {
             NSLocalizedString("vocab.auto_tag", value: "Auto", comment: "Badge on auto-mined vocabulary entries")
         }
-        // ★ 2026-11-02（用户："常用词汇要支持选择删除多选"）：多选删除。
         static var select: String {
             NSLocalizedString("vocab.select", value: "Select", comment: "Enter multi-select mode in the vocabulary editor")
         }
@@ -1872,7 +1844,6 @@ enum L10n {
             value: "Custom Server (OpenAI-compatible)",
             comment: "Section header for the user-defined ASR provider"
         ) }
-        // ★ 2026-11-04（用户："要的就是这个百炼的兼容"）：同一个自定义服务下的两种接口形态。
         static var customShape: String { NSLocalizedString(
             "asr.custom_shape",
             value: "API shape",
@@ -2197,7 +2168,6 @@ enum L10n {
 
         static var activeProviderFooter: String { NSLocalizedString("llm.active_provider_footer", comment: "") }
 
-        // MARK: 推理力度（★ 2026-11-06 · 饭耳 1.0 移植 P1-4）
 
         static var effortTitle: String {
             NSLocalizedString("llm.effort_title", value: "Reasoning Effort",
@@ -2543,11 +2513,6 @@ enum L10n {
         static var credentials: String {
             NSLocalizedString("asr.cloud.credentials", value: "Credentials", comment: "Section header inside the Azure sheet")
         }
-        /// ★ 2026-11-06（饭耳 1.0 移植 P0-2）：选型决策树。
-        ///
-        /// 云厂商一排十行，每行都写着"约 X 元/小时"，用户仍然不知道该选谁——
-        /// 缺的不是数据，是**一句话指路**。这段就是那句话，按"说什么话"分流，
-        /// 而不是按"哪家便宜"分流：方言/外语的人先试免费的，普通话会议才建议上云。
         static var decisionGuide: String {
             NSLocalizedString("asr.cloud.decision_guide",
                               value: "Not sure which one? Mandarin meetings → Alibaba Bailian (≈¥0.1/h, Chinese CER 2.25%). Cantonese or other dialects/languages → try the free on-device SenseVoice first, and only go cloud if that falls short. Just want a quick read → Apple's built-in engine (free, one language at a time).",
@@ -2685,7 +2650,6 @@ enum L10n {
 
     // MARK: - Recordings Settings
 
-    // ★ 2026-10-29 (饭耳移植 · 规格 §3.1 定时录音)
     enum TimedRecording {
         static var title: String { NSLocalizedString("timed.title", comment: "") }
         static var enable: String { NSLocalizedString("timed.enable", comment: "") }
@@ -2700,7 +2664,6 @@ enum L10n {
         /// ★ 2026-10-30：stop 命令已发出。
         static var watchStopped: String { NSLocalizedString("timed.watch_stopped", comment: "") }
         static var recording: String { NSLocalizedString("timed.recording", comment: "") }
-        // ★ 2026-11-02（用户："例如一直录，跟设置一个时间段录制"）：模式选择。
         static var modeAlways: String { NSLocalizedString("timed.mode_always", comment: "") }
         static var modeWindow: String { NSLocalizedString("timed.mode_window", comment: "") }
         static var modeRow: String { NSLocalizedString("timed.mode_row", comment: "") }
@@ -2710,8 +2673,6 @@ enum L10n {
         static var footer: String { NSLocalizedString("timed.footer", comment: "") }
     }
 
-    // ★ 2026-11-02（用户："应该是数据与存储位置，保存路径是这台 iPhone 或者
-    // iCloud，然后才是 NAS，然后就是文件夹 app"）：存储落点总枢纽页文案。
     enum StorageLocations {
         static var title: String { NSLocalizedString("storage.locations.title", comment: "") }
         /// ★ 2026-11-09：自动上传范围（哪些录音转写完自动送到目的地）。
@@ -2748,8 +2709,6 @@ enum L10n {
         static var footer: String { NSLocalizedString("storage.locations.footer", comment: "") }
     }
 
-    // ★ 2026-11-02（用户："增加一个下载使用 SenseVoice 的语音转文字的下载"）：
-    // SenseVoice 本机模型管理页文案。
     enum SenseVoice {
         static var title: String { NSLocalizedString("sensevoice.title", comment: "") }
         static var name: String { NSLocalizedString("sensevoice.name", comment: "") }
@@ -2778,8 +2737,6 @@ enum L10n {
         static var notDownloaded: String { NSLocalizedString("sensevoice.not_downloaded", comment: "") }
     }
 
-    // ★ 2026-11-02（用户："不会获取 APIkey……新增一个不会开通？复制提示词
-    // 跟粘贴结果，参考饭耳的这个快引导"）：Key 快引导页文案。
     enum KeyWizard {
         static var title: String { NSLocalizedString("keywizard.title", comment: "") }
         static var intro: String { NSLocalizedString("keywizard.intro", comment: "") }
@@ -2799,7 +2756,6 @@ enum L10n {
         static var promptTail: String { NSLocalizedString("keywizard.prompt.tail", comment: "") }
     }
 
-    // ★ 2026-10-29 (饭耳移植 · 规格 §2.3 文件 App 导出路线)
     enum FolderExport {
         static var title: String { NSLocalizedString("folder.title", comment: "") }
         static var destination: String { NSLocalizedString("folder.destination", comment: "") }
@@ -2847,7 +2803,6 @@ enum L10n {
         static var guideBody: String { NSLocalizedString("backup.guide_body", comment: "") }
     }
 
-    // ★ 2026-10-30（用户："设置最顶部加入关于 Nomily"）：关于页文案。
     enum About {
         static var title: String { NSLocalizedString("about.title", value: "About Nomily", comment: "About page navigation title") }
         static var socialHeader: String { NSLocalizedString("about.social_header", value: "Official social media", comment: "Section header of the official account links") }
@@ -2861,21 +2816,27 @@ enum L10n {
         static var privacy: String { NSLocalizedString("about.privacy", value: "Privacy Policy", comment: "Row label of the privacy policy") }
     }
 
-    // ★ 2026-10-29 (饭耳移植 · 规格 §2.3 WebDAV 存储分层)
     enum WebDAV {
         static var title: String { NSLocalizedString("webdav.title", comment: "") }
-        // ★ 2026-11-02（用户："需要增加引导如何获取对应的账号密码而不是登录密码"）：
-        // 连接区页脚的凭据引导。
         static var credentialGuide: String {
             NSLocalizedString("webdav.credential_guide",
                               value: "Username & password here are the WebDAV service credentials: on Synology/QNAP/UGREEN/fnOS they are the same as your NAS account (after WebDAV is enabled); for Nutstore and Nextcloud you MUST create an app password in their web settings — the login password gets rejected.",
                               comment: "Footer guide above the preset hint: where the WebDAV username/password come from")
         }
+        static var nextcloudPathHint: String {
+            NSLocalizedString("webdav.nextcloud_path_hint",
+                              value: "The default path is /remote.php/dav/files/your-username/Nomily/. You can choose any existing folder on the server.",
+                              comment: "WebDAV footer when Nextcloud is selected")
+        }
+        static var pastedShareLink: String {
+            NSLocalizedString("webdav.pasted_share_link",
+                              value: "This is a web sharing link, not a WebDAV address. Enter only the host name (for example, example.com), your account name, and an app password. The folder is created automatically.",
+                              comment: "Correction after pasting a web sharing URL")
+        }
         static var preset: String { NSLocalizedString("webdav.preset", comment: "") }
         static var presetUnpicked: String { NSLocalizedString("webdav.preset_unpicked", comment: "") }
         static var serverType: String { NSLocalizedString("webdav.server_type", comment: "") }
         static var host: String { NSLocalizedString("webdav.host", comment: "") }
-        /// ★ 2026-10-30（用户："端口要支持输入而不是+−这样方式"）：Stepper 换文本框。
         static var portField: String { NSLocalizedString("webdav.port_field", comment: "") }
         /// ★ 2026-10-30：极空间等 NAS 的 HTTPS 用自签证书，默认握手会被拒。
         static var allowSelfSigned: String { NSLocalizedString("webdav.allow_self_signed", comment: "") }
@@ -2909,8 +2870,6 @@ enum L10n {
         /// ★ 2026-10-30：类型选择弹层的引导语。
         static var setupFooter: String { NSLocalizedString("webdav.setup_footer", comment: "") }
 
-        // MARK: 多账户（★ 2026-11-09 · 用户："选择 nas 或者其他都是用的同一个，
-        // 没有区分每个品牌跟配置，都是点击出现的 NC 的配置"）
 
         static var savedServers: String {
             NSLocalizedString("webdav.saved_servers", value: "Saved Servers",
@@ -2965,9 +2924,6 @@ enum L10n {
         static var noSubfolders: String { NSLocalizedString("webdav.no_subfolders", comment: "") }
         static var pickFolder: String { NSLocalizedString("webdav.pick_folder", comment: "") }
         static var pickFolderFooter: String { NSLocalizedString("webdav.pick_folder_footer", comment: "") }
-        // ★ 2026-11-02（用户："上传后的文件查看不友好，布局排版需要优化"）：
-        // 服务器上的文件名从机器名（<base>.asr.json）换成给人看的名字。文件名走
-        // 词条而不是常量，中文环境直接可读；词条缺失时回落英文 value。
         static var remoteTranscript: String {
             NSLocalizedString("webdav.remote.transcript", value: "Transcript.txt",
                               comment: "Remote file name on the server: the readable transcript text")
@@ -2980,19 +2936,14 @@ enum L10n {
             NSLocalizedString("webdav.remote.note", value: "Summary.md",
                               comment: "Remote file name on the server: the editable summary + outline in Markdown")
         }
-        /// ★ 2026-11-04（用户："转化过的录音不要加密的"）：服务器上放的是**可播放**的
-        /// m4a，而不是客户端多半解不开的 .opus。
         static var remoteAudio: String {
             NSLocalizedString("webdav.remote.audio", value: "Recording.m4a",
                               comment: "Remote file name on the server: the playable audio")
         }
-        /// ★ 2026-11-04（用户："思维导图直接就是生成的图"）：导图以 PNG 上传。
         static var remoteMindMap: String {
             NSLocalizedString("webdav.remote.mindmap", value: "Mind Map.png",
                               comment: "Remote file name on the server: the rendered mind map image")
         }
-        /// ★ 2026-11-04（用户："然后 NC 上传也是"）：和分享同一套打包，整条资料一个 zip。
-        /// 散文件仍然保留——网盘网页端能直接读、能直接看图，包是给"整条拿走"用的。
         static var remoteBundle: String {
             NSLocalizedString("webdav.remote.bundle", value: "Bundle.zip",
                               comment: "Remote file name on the server: the zipped summary + mind map + to-dos + transcript")
@@ -3022,7 +2973,6 @@ enum L10n {
     enum RecordingsSettings {
         static var deleteAfterTransfer: String { NSLocalizedString("rec_settings.delete_after_transfer", comment: "") }
         static var deleteAfterTransferFooter: String { NSLocalizedString("rec_settings.delete_after_transfer_footer", comment: "") }
-        // ★ 2026-10-29 (饭耳移植 · 规格 §2.2 录音质量 + 冷数据降级)
         static var qualityTitle: String { NSLocalizedString("rec_settings.quality_title", comment: "") }
         static var qualityFooter: String { NSLocalizedString("rec_settings.quality_footer", comment: "") }
         static var qualityTierAsIs: String { NSLocalizedString("rec_settings.quality_as_is", comment: "") }
@@ -3040,7 +2990,6 @@ enum L10n {
         static func qualityReport(_ done: Int, _ skipped: Int) -> String {
             String(format: NSLocalizedString("rec_settings.quality_report", comment: ""), done, skipped)
         }
-        // ★ 2026-10-29 (饭耳移植 · 规格 §2.2 试听)
         static var auditionLoad: String { NSLocalizedString("rec_settings.audition_load", comment: "") }
         /// ★ 2026-11-02：试听池只收手表录音，一段都没有时给一句提示。
         static var auditionEmpty: String { NSLocalizedString("rec_settings.audition_empty", comment: "") }
@@ -3627,8 +3576,6 @@ enum L10n {
                 comment: "Cancel button in the stop confirmation"
             )
         }
-        /// ★ 2026-10-30（用户："录音断联需要状态弹出提醒告知，点击或者在附近就重连"）：
-        /// 录音期间与手机断联的提醒弹窗。
         static var linkLostTitle: String {
             NSLocalizedString(
                 "watch.link_lost_title",
@@ -3650,10 +3597,6 @@ enum L10n {
                 comment: "Button in the link-lost alert that re-pushes state and re-sends queued clips"
             )
         }
-        /// ★ 2026-11-03（用户："手表如果断开了，需要通知栏弹出，然后点击自动重连或者不点击也可以"）：
-        /// 系统通知正文。应用内 alert 的 `linkLostMessage` 太长，通知里只放一句。
-        /// ★ 2026-11-03（V4 原型）：省电录音时的状态标签。
-        /// 和 `listening` 一样保留英文——它是这套设计语言里的状态词，不翻译。
         static var moonlit: String {
             NSLocalizedString(
                 "watch.moonlit",
@@ -3713,10 +3656,6 @@ enum L10n {
                 count
             )
         }
-        // ★ 2026-11-02（用户："手表的整体风格朝着这个看起…他这个里面的内容你也可以加入进来"）：
-        //   首页按 `nomily-watch-v3-blink.html` 重做——顶栏时钟、LISTENING 呼吸点、
-        //   大号细体计时、以及新增的「最近 / 同步」两页。
-        /// 「最近」页的标题（原型里的 `Recent`）。
         static var recent: String { NSLocalizedString("watch.recent", comment: "") }
         static var recentEmpty: String { NSLocalizedString("watch.recent_empty", comment: "") }
         /// 摘要里既没有标题也没有要点时，列表里那行主题的兜底文案。
@@ -3743,8 +3682,6 @@ enum L10n {
         }
         static var menuHeader: String { NSLocalizedString("watch.menu_header", comment: "") }
 
-        // ★ 2026-11-02 第二轮（用户："手表需要为全天候录音设置，这个功耗跟传输需要优化"）：
-        // 全天候录音（省电模式）——采样/重绘放慢 + 回传暂缓。
         static var allDayTitle: String { NSLocalizedString("watch.allday_title", comment: "") }
         static var allDayHint: String { NSLocalizedString("watch.allday_hint", comment: "") }
         // MARK: ★ 2026-11-05 触感等级（录音起止震动的力度，1–5 档）
@@ -3768,10 +3705,6 @@ enum L10n {
             return NSLocalizedString("watch.haptic_\(level)", value: fallback,
                                      comment: "Watch settings: haptic strength level label")
         }
-        // MARK: ★ 2026-11-05 第二轮（用户："停止录音跟结束录音震动效果也要多出几个"）
-        // 录音起止的**花样**（节奏），与上面的力度档位正交：力度管"多重"，这里管"怎么响"。
-        // ★ 第三轮（用户："震动样式里面分启动震动跟结束震动"）：拆成启动/结束两组标题。
-        // 键名按 `WatchHapticPattern.rawValue` 拼（single / double / triple / single_long / heartbeat / crescendo）。
         static var hapticStartTitle: String {
             NSLocalizedString("watch.haptic_start_title", value: "Start buzz",
                               comment: "Watch settings: haptic rhythm played when a take starts")
@@ -3992,7 +3925,6 @@ enum L10n {
                               comment: "Watch quick menu: what the version page holds")
         }
 
-        // MARK: 电量监控（★ 2026-11-03 八轮，用户："手表菜单栏加一个电量消耗监控"）
 
         static var menuBattery: String {
             NSLocalizedString("watch.menu_battery", value: "Battery",
@@ -5055,10 +4987,6 @@ enum L10n {
                                              comment: "To-do header for the collapsed group of checked rows"), count)
         }
 
-        // MARK: 打包分享（★ 2026-11-04 用户："把我当前总结、思维导图、待办都进行分享出去打包方式"）
-        //
-        // 之前分享是"一件一件来"：导图一张图、摘要一个 md、待办只能截屏，发给同事要来回翻。
-        // 这里给一个 zip 入口，两个粒度：只发文档 / 连录音一起。
         static var todosTitle: String {
             NSLocalizedString("clip_detail.todos_title", value: "To-dos",
                               comment: "Heading of the to-do list inside the share bundle's 待办.md")
@@ -5125,12 +5053,9 @@ enum L10n {
             NSLocalizedString("summary.layout.notes", value: "Notes",
                               comment: "Summary layout badge: the default clean document layout")
         }
-        /// ★ 2026-10-30（用户："笔记来源要支持能够直接在摘要进行编辑"）：
-        /// 摘要标题栏的编辑入口——带文字，不再是一枚看不出用途的小铅笔。
         static var editSummary: String {
             NSLocalizedString("clip_detail.edit_summary", value: "Edit", comment: "Button in the summary header that opens the inline markdown editor")
         }
-        /// ★ 2026-10-30（用户："待办支持手写待办"）：待办区底部的输入框。
         static var addTodoPlaceholder: String {
             NSLocalizedString("clip_detail.add_todo", value: "Add a to-do", comment: "Placeholder of the free-text row that adds a manual to-do")
         }
@@ -5171,7 +5096,6 @@ enum L10n {
         static var exportAudio: String { NSLocalizedString("clip_detail.export_audio", value: "Export Audio", comment: "Menu row that opens the audio format choices") }
         static var exportAsM4A: String { NSLocalizedString("clip_detail.export_as_m4a", comment: "") }
         static var exportAsWAV: String { NSLocalizedString("clip_detail.export_as_wav", value: "Export as WAV (PCM)", comment: "WAV export option — uncompressed audio") }
-        // ★ 2026-10-22 (任务二): document export + email attachments.
         static var exportDocument: String { NSLocalizedString("clip_detail.export_document", value: "Export Document", comment: "Menu row opening the txt/md/pdf choices") }
         static var exportAsTXT: String { NSLocalizedString("clip_detail.export_as_txt", value: "Export as TXT", comment: "Plain-text transcript export") }
         static var exportAsMarkdown: String { NSLocalizedString("clip_detail.export_as_md", value: "Export as Markdown", comment: "Markdown export (summary + transcript)") }
@@ -6085,18 +6009,6 @@ enum L10n {
 
     // MARK: - Jobs (background task overview)
 
-    /// The **overview** strings for the four kinds of long-running jobs (twelfth revision, 2026-10-16).
-    ///
-    /// This layer only solves "being visible": scheduling for summary / translation / format conversion lives in `JobQueue`,
-    /// transcription still lives in `TranscriptionService`, but both appear in one list on the overview page.
-    ///
-    /// ⚠️ Keep the wording consistent with the `ASR.queue_*` batch: **never say "silent audio"**. What users want
-    ///    to judge is "will it keep going after I switch away", not how we keep the process alive.
-    /// 待办看板（★ 2026-11-06 · 饭耳 1.0 移植 P0-1）。
-    ///
-    /// 文案基调学饭耳：不说"待办项"，说人话——「都看完了」「今天做完 1 件」
-    /// 「卡片攒了很久，现在处理一下」。状态词用动词短语而不是名词，
-    /// 因为每个状态都是用户做过的一个**决定**。
     enum Todo {
         static var title: String { NSLocalizedString("todo.title", value: "To-dos", comment: "To-do board page title") }
         static var settingsRow: String { NSLocalizedString("todo.settings_row", value: "To-do Board", comment: "Settings row for the to-do board") }
@@ -6315,7 +6227,6 @@ enum L10n {
             NSLocalizedString("jobs.open_queue", value: "Background tasks",
                               comment: "Settings row: opens the task center")
         }
-        /// ★ 2026-10-22 (任务三): AiTask recovery verdict at launch.
         static var interrupted: String {
             NSLocalizedString("jobs.ai_task_interrupted",
                               value: "Interrupted — the app was closed before this step finished.",
@@ -6334,7 +6245,6 @@ enum L10n {
                    kind)
         }
     }
-    // MARK: - Phone recording (任务一, 2026-10-22)
 
     /// Strings for the phone-microphone recording screen + live captions.
     enum Phone {
@@ -6500,8 +6410,6 @@ enum L10n {
 
 // swiftlint:enable type_body_length file_length
 
-/// ★ 2026-11-09（用户："可以选择上传哪些"）：每个目的地的产物开关
-/// （WebDAV 编辑页与文件夹导出页共用同一组词条）。
 enum L10nUploadContent {
     static var section: String {
         NSLocalizedString("upload.section", value: "What to Upload",
@@ -6534,8 +6442,6 @@ enum L10nUploadContent {
     }
 }
 
-/// ★ 2026-11-09（用户："英文语言展示中文需要优化"）：录音豆 Wi‑Fi 快传整条
-/// 流程原来是硬编码中文——英文界面下全部漏中文。统一收进这一组词条。
 extension L10n {
     enum WifiXfer {
     static var statusSection: String { NSLocalizedString("wifix.status_section", value: "Status", comment: "") }

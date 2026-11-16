@@ -251,13 +251,6 @@ struct RecorderDeviceView: View {
     /// `nil` = nothing to auto‑transfer this time (recording start failed / already transferred).
     @State private var autoTransferSessionID: UInt32?
 
-    /// ★ Auto-delete recordings on the card after transfer.
-    ///
-    /// ★ 2026-10-29（用户："传输偏好按键没实际反应，直接不要"）：原来这里是
-    /// `@AppStorage("ticnote.delete_after_transfer")`（UserDefaults），而 Wi‑Fi 快传、
-    /// 设置页全局开关读的都是 `config.autoDeleteAfterTransfer`（config.json）——
-    /// 两套存储互不相通，设备信息弹层里那个开关拨了等于没拨（用户实测）。
-    /// 现在统一读全局配置；`CardTransferPrefsSection` 已删除。
     private var deleteAfterTransfer: Bool { configService.config.autoDeleteAfterTransfer }
 
     /// Pending deletion recordings (swipe to delete → confirmation dialog).
@@ -796,14 +789,7 @@ struct RecorderDeviceView: View {
     /// 4. **Multi-select mode** → switch to `selectionBar` (N selected / Select All / Cancel / Send Selected).
     @ViewBuilder
     private var fastTransferBar: some View {
-        // ★ 2026-10-27（用户："WiFi 快传的功能在首页设备下面，参考 ticnote 的方式"）：
-        // 豆的快传入口原来埋在"卡片信息"弹层里，首页设备页根本看不到。现在与
-        // TicNote 一样做成**底部常驻栏**：连接即可见，进行中变进度条。
         if recorder.protocolID == SoundcoreRecorderSpec.identifier {
-            // ★ 2026-11-03（用户："安克的录音豆要支持选择那个录音进行传输，避免每次录音都传输"）：
-            //   豆这边以前只有「导出全部」，没有选择态。现在与 TicNote 共用同一套多选
-            //   （`isSelecting` / `selectedIDs` / 行内勾选圈都在 `row(_:)` 里），
-            //   只是底栏换成豆自己的那一条——导出走 Wi‑Fi 快传而不是 BLE。
             if isSelecting {
                 soundcoreSelectionBar
             } else {
@@ -845,9 +831,6 @@ struct RecorderDeviceView: View {
     /// ★ 2026-10-28：自动加入豆热点失败时的手动加入弹窗（同一次导出会话内，
     /// 因为每次导出都会生成新的 SSID/密码，跨会话手动加入没有意义）。
     @State private var soundcoreManualJoin: SoundcoreManualJoinPrompt?
-    /// ★ 2026-10-29（用户："参考 V05E 的 WiFi 快传，直接弹出一个页面"）：
-    /// D3200 的 Wi‑Fi 快传也弹独立页——`runSoundcoreWifiExport()` 往这个 model
-    /// 里填阶段/进度/每文件状态，`SoundcoreWifiTransferSheet` 只负责展示。
     @State private var soundcoreWifiUI: SoundcoreWifiTransferModel?
 
     private var soundcoreLink: SoundcoreLink? {
@@ -1016,12 +999,6 @@ struct RecorderDeviceView: View {
         guard !soundcoreWifiRunning else { return }
         soundcoreWifiRunning = true
         soundcoreWifiError = nil
-        // ★★ 2026-11-03 五轮（用户："WiFi 快传要传很多次才能传完"）：
-        //   **锁屏 = 传输必断**。录音豆的快传靠一条长连 WebSocket + 豆自己的热点，
-        //   App 一进后台/锁屏，iOS 立刻挂起进程，socket 被系统掐掉——回到前台只能
-        //   从断点重开会话（一轮 ~1 分钟）。用户"点了快传就去干别的"，于是每次都被
-        //   切成好几段，看起来就是"要传很多次"。V05E 的 `FastTransferSheet` 早就
-        //   禁用了自动锁屏，这里漏了，补上。
         UIApplication.shared.isIdleTimerDisabled = true
         defer {
             soundcoreWifiRunning = false
@@ -1120,10 +1097,6 @@ struct RecorderDeviceView: View {
             var partialCount = 0
             var partialSaved = 0
             for f in exported {
-                // ★ 2026-10-28（用户："大文件传输还是没完成"）：豆的 WS 单连接
-                // 在 ~55 MB 处就停发，60 MB 这种大录音以前一律被跳过 —— 用户
-                // 拿到的是"什么都没有"。现在按实收率决定：≥50% 照样入库（附
-                // "传输不完整"标注，Opus 流截断仍然能播到断点），<50% 才跳过。
                 if f.partial && f.coverage < 0.5 {
                     partialCount += 1
                     ui.markFailed(fileId: f.fileId, message: L10n.WifiXfer.partialSkipped(Int((f.coverage * 100).rounded())))
@@ -1177,9 +1150,6 @@ struct RecorderDeviceView: View {
                 }
             }
 
-            // ★ 2026-10-27（用户："点击 WiFi 快传会断开安克录音豆"）：豆为了开热点
-            // 会主动断 BLE（传输模式），导出结束后不会自己连回来。这里显式接回，
-            // 后面"删除豆上录音"和列表刷新都要靠这条 BLE。
             var activeLink = link
             if activeLink.isConnected == false {
                 soundcoreWifiStatus = L10n.WifiXfer.reconnecting
@@ -1221,10 +1191,6 @@ struct RecorderDeviceView: View {
             if deleted > 0 { message += L10n.WifiXfer.deletedNote(deleted) }
             if deleteFailed > 0 { message += L10n.WifiXfer.deleteFailedNote(deleteFailed) }
             if deleteSkipped { message += L10n.WifiXfer.deleteBtNote }
-            // ★ 2026-10-29（用户："自动删除开关是关着的，为啥也删了？"）：
-            // 实锤是**豆固件的"传完即删"**——录音被完整传走后豆自己删（日志里
-            // App 没发过任何删除指令；没传完整的从不被删；飞书传完的也是豆删的）。
-            // 开关只管蓝牙路径。这里如实告知，免得用户以为开关失效。
             if saved > 0, partialCount == 0, deleted == 0 {
                 message += L10n.WifiXfer.autoDeletedNote
             }
@@ -1236,7 +1202,6 @@ struct RecorderDeviceView: View {
             soundcoreWifiUI?.markCancelled()
             banner = nil
         } catch {
-            // 失败路径同样要把豆接回来：热点一开 BLE 就断了（用户："点击 WiFi 快传会断开安克录音豆"）。
             if soundcoreLink?.isConnected == false {
                 _ = try? await bluetooth.ensureRecorderLink(recordID: recorder.id.uuidString, timeout: 20)
                 if soundcoreLink?.isConnected == true { await connectAndList(showsLoading: false) }
@@ -1501,15 +1466,7 @@ struct RecorderDeviceView: View {
         // peripheral stops advertising and the radar has nothing to measure.
         FindCardSection(connected: connectedLink?.isConnected ?? false)
 
-        // ⑤ ★ 2026-10-29（用户："传输偏好模块可删除，按键没实际反应"）：移除
-        //    `CardTransferPrefsSection`。它写的 `@AppStorage("ticnote.delete_after_transfer")`
-        //    与实际删除逻辑读的 `config.autoDeleteAfterTransfer`（设置页全局开关）
-        //    是两套存储——对 Wi‑Fi 快传完全没有作用。现在 BLE 下载路径也统一读
-        //    全局开关（见本文件 `deleteAfterTransfer` 计算属性），一个开关管所有路径。
 
-        // ⑤b ★ soundcore D3200 Wi‑Fi 快传入口 → 2026-10-27 移到首页设备页
-        //    底栏（fastTransferBar 的 soundcore 分支），与 TicNote 同位；这里
-        //    不再重复放一份（用户："WiFi 快传在首页设备下面，参考 ticnote"）。
 
         // ⚠️ Unbinding this section **is intentionally kept at the outermost level**. When the link is not established (`connectedLink == nil`,
         //    e.g., the card is lost, returned, or this firmware version cannot connect) it **still must be visible** ——
@@ -1725,9 +1682,6 @@ struct RecorderDeviceView: View {
 
                 Text(recordingLabel)
                     .font(.subheadline.weight(.medium))
-                // ★ 2026-11-04（用户："P101 已经链接了但没办法录音"）：把闸门的原因说出来。
-                //   以前这里只有 `.disabled(!canToggle)`——按钮灰着、点不动、一个字都不解释，
-                //   用户只会以为"连上了却坏了"。`keyHealth` 是 @ObservedObject，状态一变就重绘。
                 if keyHealth.state.needsAttention, let blockedReason = activeSession.startBlockedReason {
                     VStack(spacing: 6) {
                         Label(blockedReason, systemImage: "lock.fill")
@@ -1797,9 +1751,6 @@ struct RecorderDeviceView: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-            // ★ 2026-10-29（用户："录音豆和卡片是两个设备，要显示两个电量"）：
-            // D3200 上报两个电量——豆本体（主行）+ 充电盒（这一行）。
-            // 盒电量只在 `getDeviceInfo` 快照里有，keep-alive 推的 0x09 帧只有豆本体。
             if let secondary = deviceInfo?.secondaryBatteryPercent {
                 HStack {
                     Label(deviceInfo?.secondaryBatteryLabel ?? L10n.WifiXfer.batteryCase, systemImage: batterySymbol)
@@ -2072,10 +2023,6 @@ struct RecorderDeviceView: View {
         // The A1's index carries no size (flag/fid/status per record) — 0 means "unknown",
         // and inventing "0.0 MB · 0 s" from it would read as a broken card.
         guard recording.sizeBytes > 0 else { return recording.id }
-        // ★ 2026-10-27（用户："录音多少 s 但是到设备的秒数不对"）：优先用协议层给的
-        // `durationMs` —— 豆的 `1B 0E` 条目带 endTime，`endTime − fileId` 是精确秒数；
-        // 在录的那条用设备自报的 currTransportFileDuration（实时增长）。
-        // 只有拿不到时才回落到"按字节数换算"（160 B = 20 ms）。
         let seconds: Double
         if let ms = recording.raw["durationMs"] as? Int, ms > 0 {
             seconds = Double(ms) / 1000

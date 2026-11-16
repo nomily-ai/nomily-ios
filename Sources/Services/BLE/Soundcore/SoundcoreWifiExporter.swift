@@ -265,11 +265,6 @@ final class SoundcoreWifiExporter: NSObject {
                     // 在 1A07 头里，pullOverWs 收到头后会覆盖 fileExpected。
                     fileTotal: f.estimatedSizeBytes
                 ))
-                // 一个文件最多跨 8 个 Wi‑Fi 会话拼接。设备健康时单会话 ~50 MiB；
-                // ★ 2026-10-29（用户："录音卡住无法完整传输"）：豆状态差时单会话
-                // 实测只吐 10–15 MB——60 MB 的录音从 0 传需要 5 段起步，上限太低
-                // 会拼到一半主动放弃（= 卡住传不完）。8 段 ≈ 120 MB 容量，且
-                // 0 收益的会话有看门狗拦截，不会白烧。
                 var acc = Data()
                 var accWire = 0
                 // ★ 2026-10-29：磁盘断点——上次导出没传完的部分还在，这次直接续。
@@ -499,25 +494,6 @@ final class SoundcoreWifiExporter: NSObject {
 
     // MARK: hotspot join (step 3)
 
-    /// 加入豆的热点。
-    ///
-    /// ★ 2026-10-27（用户："WiFi 快传点击提示无法加入网络"）：豆收到 1A05 后
-    /// 要几秒才能把 SoftAP 广播出来，**立刻 apply 会被系统以"无法加入网络"拒绝**
-    /// （SSID 还不存在）。所以带间隔重试；但两种情况**立即失败**，重试毫无意义：
-    ///  - `userDenied` / `applicationIsNotInForeground` → 用户在系统弹窗点了不允许；
-    ///  - `invalidSSID` / `invalidWPAPassphrase` → 凭据本身不合法（固件口径变了）。
-    /// 这两种直接把原因抛出去，不再盲试 6 次给用户看 40 秒转圈。
-    ///
-    /// ★ 2026-10-28（用户："iOS 还是无法继续使用，Android 可以"）：补两件事——
-    ///  ① `apply` 返回成功**不代表真的连上了**（DHCP 也可能失败），用
-    ///     `NEHotspotNetwork.fetchCurrent` 核对当前 SSID，没连上就继续重试；
-    ///  ② 全部失败时不再"假装继续"去连 WS（白等 60 秒），直接抛出一条**可执行**
-    ///     的指引：手动加入哪个 SSID、密码是多少。Android 能过、iOS 过不去，
-    ///     说明固件的 AP 对 iOS 的自动加入不友好，手动加入是确定的通路。
-    /// - Parameter reuseExisting: ★ 2026-10-29（用户："只要一次点击加入即可"）：
-    ///   重开会话时**凭据与上次相同**——此时系统里已有这套配置，不再 remove/重建
-    ///   （那会触发系统重新授权），先把等待缩短到 5 s，然后**先查是否还挂在热点上**，
-    ///   挂着就直接返回（省 20 s 重入网）；`joinOnce` 也改为 false，让系统自动回连。
     private func joinDeviceAp(ssid: String, psk: String, reuseExisting: Bool = false) async throws {
         if reuseExisting {
             if await isOnNetwork(ssid) {
@@ -837,14 +813,6 @@ final class SoundcoreWifiExporter: NSObject {
         // 快速失败会把"还在启动"判成"死了"。放宽到 5 次 × 5 s（≈30 s），
         // 仍不通才标记 isTCPDead 交给上层自动重开会话。
         var probesOK = false
-        // ★ 2026-10-30：探测间隔 5s×5 → **2s×3 + 5s×2**。日志（10:33）显示服务真死
-        // 时探测是"立刻拒连"，5 s 间隔纯属白等；而服务"还在启动"时需要总窗口 ~30 s，
-        // 所以只收紧前 3 次——真死更快判死进重开，慢启动不被误杀。
-        // ★★ 2026-11-03（真机日志 19:15–19:21，用户："WiFi 快传传输多次才能传输完毕"）：
-        //   实测一次 15MB 的导出花 7 分钟，其中 3 次会话重开占 ~4.5 分钟；单是
-        //   "5 次探测全烧完才升级"就吃掉 53s。而且重开后的新会话里服务都是秒就绪的——
-        //   "前 3 次不通"之后剩下的 2 次慢探测**从没救回过任何一次连接**。
-        //   所以砍掉 5s×2 尾巴：3 次（窗口 ~24s）不通就升级重开会话，单轮省 ~30s。
         probeLoop: for probeAttempt in 1...3 {
             if cancelled { throw WifiExportError(message: "已取消") }
             if await probeTcp(ip: endpoint.ip, port: UInt16(endpoint.port)) {
@@ -1024,12 +992,6 @@ final class SoundcoreWifiExporter: NSObject {
 
     private func startKeepalive(ip: String) {
         stopKeepalive()
-        // ★ 2026-10-29（rea 逆向 A/B，文档 §3/§7）：飞书 KMP 在 `platform()=="iOS"`
-        // 时**直接 continue 跳过 UDP 保活**（obf.y5.q smali 实锤），官方 iOS 端只靠
-        // WS ping/pong 维持。Nomily 之前每 100 ms 发一发（比 Android 官方常用值还密
-        // 20 倍），而真机症状恰是"豆传到一半哑掉、seq 疯跳、WS 被掐"——逆向文档
-        // 明确建议"遇设备侧异常可尝试关掉对比"。现在**与官方 iOS 行为完全一致**：
-        // 不发 UDP。要 A/B 回切，把 sendsUdpKeepalive 改 true 即可。
         guard Self.sendsUdpKeepalive else {
             TicNoteDiagLog.log("D3200 WIFI",
                 "udp keepalive disabled (official iOS behavior: WS ping/pong only)")
@@ -1135,14 +1097,6 @@ final class SoundcoreWifiExporter: NSObject {
         TicNoteDiagLog.log("D3200 WIFI",
             "pull start file=\(fileId) expected=\(fileExpected) from=\(startOffset) seed=\(seed.count)B")
 
-        // ★ 2026-10-28（用户："大文件传输还是没完成"）：真机两轮日志放在一起看——
-        //   19:00 那轮 socket 收 55,137,267 B 后停；
-        //   19:12 那轮 socket 收 54,701,921 B 后停；
-        // 而文件是 60,149,602 B。**每次都在 socket ≈55 MB 处断**，不是丢包、不是
-        // 我们解析不过来，是单条 WS 连接的传输上限。所以"原地重发 1A07"没用
-        // （19:12:59 试过，同一条连接上设备直接哑掉），必须**换一条新连接再续传**：
-        // 断开 WS → 重连 → 1A07 带 transferredSize = 已收字节数 → 继续往同一缓冲区追加。
-        // 60 MB 的文件因此会 55 MB + 5 MB 跨两条连接拼完；再大就多拼几条（上限 8 条）。
         var lastBytes = 0
         var lastGrowth = Date()
         var firstByteDeadline = Date().addingTimeInterval(12)
@@ -1239,12 +1193,6 @@ final class SoundcoreWifiExporter: NSObject {
                     // 收尾——FINISH 让它自己关掉 Wi‑Fi 模式，BLE 广播才会回来。
                     // 反正马上要重开 1A05 会话，旧会话结束没有副作用。
                     try? await sendText("FINISH", timeoutSeconds: 2)
-                    // ★★ 2026-11-03 五轮（用户："WiFi 快传要传很多次才能传完"）：
-                    //   **立刻**把手机从豆的热点上摘下来，而不是等 restartWifiSession
-                    //   里 BLE 重连失败（12s 空等）才做。豆只要还有客户端连着就不退出
-                    //   Wi‑Fi 模式、不恢复蓝牙广播——先摘配置 = 豆马上看到 AP 空了，
-                    //   BLE 常在第一次重连（5–10s）就回来，整轮重开省 10–20s。
-                    //   FINISH 已经发给豆做干净收尾，摘配置不会再伤会话。
                     if let current = ssid {
                         NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: current)
                     }

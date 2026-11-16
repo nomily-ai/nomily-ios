@@ -1,15 +1,6 @@
 import Combine
 import Foundation
 
-/// ★ 2026-10-28（饭耳逆向规格 §1.2「每日 token 用量热力图」）：
-/// 按天累计大模型消耗，供设置页的贡献图式热力图展示。
-///
-/// 口径说明（诚实地写在存储里，UI 也照此措辞）：
-/// - 三个云厂商（OpenAI/Claude/Gemini）与非流式网关会回 `usage`，但本项目
-///   的请求链路有流式/分块/重试多条，**统一取 usage 需要改七处解析**，收益不值；
-/// - 因此这里按 **字符数 × 0.62** 估算 token（0.62 = 本仓库已实测的中文
-///   tokens/字符 比例，见 `LLMCompletionService.maxCharsPerRequest` 注释），
-///   用于"哪天用了多少"的相对趋势，不做账单级精确值。
 final class TokenUsageStore: ObservableObject {
 
     static let shared = TokenUsageStore()

@@ -3,20 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "folder-export")
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.3 保存位置 · 文件 App 路线）
-///
-/// The second destination alongside WebDAV: the user picks **any** folder via
-/// the document picker (iCloud Drive, "我的 iPhone", or a provider app's
-/// container — the spec names Obsidian vaults explicitly) and transcripts —
-/// plus optionally audio — are copied there.
-///
-/// Scope mechanics (the part that bites if done wrong):
-///   · The picker URL is security-scoped; we persist a **bookmark** in
-///     UserDefaults and `startAccessingSecurityScopedResource` around every
-///     export pass, stopping access when it ends. Holding access forever is
-///     not how the API is meant to be used and iOS revokes it anyway.
-///   · Idempotent like the WebDAV sweep: an identical-sized destination file
-///     is skipped, so re-running is cheap and safe.
 @MainActor
 final class FolderExportService: ObservableObject {
 
@@ -28,18 +14,11 @@ final class FolderExportService: ObservableObject {
     /// ★ 2026-10-30：自动导出是否连录音一起。把页面上的「也导出录音」持久化
     /// 到服务里——自动路径没有 UI 在场，得自己读这份状态。
     static let audioKey = "export_folder_sync_audio"
-    /// ★ 2026-11-09（用户："可以选择上传哪些"）：文件夹目的地要写哪些产物。
-    /// 与 autoEnabled/syncAudio 同一套 UserDefaults 持久化模式。
     static let contentKey = "export_folder_upload_content"
 
     @Published var isRunning = false
     @Published var lastReport: String?
-    /// ★ 2026-11-02（用户："展示占用内存"）：所选文件夹的占用统计行
-    /// （递归文件数 + 总字节，异步算，iCloud 目录可能有占位文件）。
     @Published var usageText: String?
-    /// ★ 2026-11-02（用户："导出到文件夹应该是 iCloud 的默认路径方便自动云备份"）：
-    /// 打开后每次转写完成自动把这条的文本（+可选录音）写进所选文件夹。
-    /// 目标是 iCloud 云盘里的文件夹时，这就是"自动上传 iCloud"。
     @Published var autoEnabled: Bool {
         didSet { UserDefaults.standard.set(autoEnabled, forKey: Self.autoKey) }
     }

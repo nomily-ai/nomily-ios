@@ -13,24 +13,6 @@ import os.log
 /// woken in the background. The page spent most of its life showing a status
 /// that was stale, wrong, or "connecting", which is worse than not offering it.
 
-// MARK: - ★ 2026-11-06 后台刷新排程（不点开 App 也能收发数据）
-//
-// 用户："不点开 App 手表就跟手机连不上，希望 App 启动后保持链接——这策略可行吗？"
-//
-// ## 结论（按 Apple 文档核实）
-// **实时连接（`isReachable`）不可能常驻**：它要求两端 App 都在前台，手表 App 一进
-// 后台就被挂起——系统设计，无 API 可绕。但**数据不依赖实时连接**：
-// `applicationContext` / `transferUserInfo` / 文件传输都是"投递到收件箱"，App 被
-// 唤醒的瞬间由 WCSession 激活回调自动送达。
-//
-// ## 这套排程做什么
-// 给自己排 `WKApplicationRefreshBackgroundTask`（预算制，约每小时 1-2 次，系统可能
-// 推迟）：被叫醒 → App init 里 `link.activate()` 幂等激活会话 → 手机的收件箱
-// （设置/表情/待传回执等）自动收完 → `runOnce` 把链条续上（排下一次）。
-// 录音中不依赖这个：workout 会话本来就全程保活常显。
-//
-// ⚠️ `runOnce` 里**不要碰录音模型**：后台唤醒时 `@StateObject` 的 wrappedValue
-//    还没执行（首帧才创建），模型可能不存在。
 
 enum WatchBackgroundRefresher {
     static let taskID = "com.nomily.watch.refresh"
@@ -85,10 +67,6 @@ struct NomilyWatchApp: App {
                 recorder?.startRemotely()
                 if let endsAt { recorder?.scheduleRemoteStop(at: endsAt) }
             case "stop":
-                // ★ 2026-11-06（全天候语义，用户："全天候录音打开的就不存在说不录音
-                // 这么一说"）：全天候开着时远程 stop 无效——只撤掉到点兜底停的定时器，
-                // 录音不动。重放的旧 stop 已在 WatchLink 按 issuedAt 挡掉，这里是
-                // 第二道保险（新鲜 stop 命令 vs 全天候开关，开关说了算）。
                 if WatchRecordingPrefs.shared.allDayRecording {
                     recorder?.cancelRemoteStop()
                 } else {
@@ -99,11 +77,6 @@ struct NomilyWatchApp: App {
                 break
             }
         }
-        // ★ 2026-11-05（全天候录音开关双端同步）：手机上翻的开关落到这里——
-        // 只在值真的变了时写偏好 + 推模型（setPowerSaver 幂等，但别白动采样器）。
-        // ★ 第四轮（用户："点击了全天候录音的开关则需要自动就开启了录音"）：
-        // 手机上翻开开关，手表**当场自动开录**——autoStartForAllDayIfNeeded 幂等，
-        // 与表上设置页那条路共用一个收口，同时触发也只会开一场。
         link.onAllDaySetting = { [weak recorder] on in
             guard WatchRecordingPrefs.shared.allDayRecording != on else { return }
             WatchRecordingPrefs.shared.allDayRecording = on
@@ -111,9 +84,6 @@ struct NomilyWatchApp: App {
             if on {
                 recorder?.autoStartForAllDayIfNeeded()
             } else {
-                // ★ 2026-11-06（全天候语义，用户："手机的开关设置全天候录音的开关
-                // 也要跟随一样"）：手机上关开关 = 唯一的停止方式。此刻偏好已是
-                // false，stop 末尾的自动续录不会触发；没在录则幂等空操作。
                 recorder?.stop()
             }
         }

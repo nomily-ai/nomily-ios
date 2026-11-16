@@ -1,23 +1,6 @@
 import CoreBluetooth
 import Foundation
 
-// MARK: - soundcore Work / D3200（飞书录音豆）binary framing, commands, models
-//
-// Faithful Swift port of the verified Kotlin protocol layer:
-//   · nomily-android `core/protocol/SoundcoreFrames.kt`
-//   · nomily-android `core/protocol/SoundcoreCommands.kt`
-//   · nomily-android `core/protocol/SoundcoreModels.kt`
-// (protocol reference: `03-逆向/录音豆/ref/Soundcore/PROTOCOL.md` §4–§6.3)
-//
-// TX: `08 EE 00 00 00 | cmdType | cmdId | len_lo | len_hi | payload… | checksum`
-// RX: `09 FF 00 00    | status  | cmdType | cmdId | len_lo | len_hi | payload… | checksum`
-//
-// checksum = 低 8 位字节和（对不含校验字节的前缀求和）。
-//
-// ★ 红线（用户决策 2026-10-27，设备要与飞书 App 长期并行）：本文件**故意不移植**
-// `bind()` / `unbind()`（0x0B/0x87）与 `resetDevice()`（0x01/0xB8）——这四类命令
-// 会改变设备的绑定/持久状态，可能影响原厂 App。其余命令（信息、录音控制、
-// 文件传输、加密握手）均为无持久副作用的读/会话级操作。
 
 enum SoundcoreFrame {
     static let txMagic: [UInt8] = [0x08, 0xEE, 0x00, 0x00, 0x00]

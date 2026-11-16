@@ -4,21 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "vocab")
 
-/// ★ 2026-10-28（饭耳逆向规格 §1.4「常用词」）：用户维护的专名提示表。
-///
-/// 用途（与饭耳的语义约定一致，原文：「只是提示，不会把别的词强行换成它」）：
-/// 整理/摘要 prompt 里附上这份词表，让大模型认识产品名、人名、内部术语——
-/// 转写里常见的专有名词被听错时，模型能按词表纠正表达。
-///
-/// 设计要点：
-/// - **上限 2000**（对齐饭耳）；超出后 `add`/`importText` 拒绝并返回失败数；
-/// - 存 `StorageLocations.vocabularyURL`（App Group JSON），跨 launch、跨设备页共享；
-/// - `promptHint()` 只取前 N 条拼一行，避免长词表把 prompt 撑爆。
-///
-/// ★ 2026-10-29（用户："常用词汇里面从历史的文档里面提取，还有出现频率跟来源"）：
-/// 条目从纯字符串升级为 `VocabEntry`（词 + 出现次数 + 来源录音 + 是否自动挖出），
-/// 存储向后兼容旧 `[String]` JSON；新增 n-gram 频次挖掘器（`mineTranscripts`），
-/// 从已转写的 .txt 里把反复出现的 2–4 字词提上来标"自动加入"，来源可查。
 struct VocabEntry: Codable, Equatable, Identifiable {
     var word: String
     /// 在全部转写文本里出现的次数（挖掘时统计；手填词为 0）。
@@ -76,8 +61,6 @@ final class VocabularyStore: ObservableObject {
         persist()
     }
 
-    /// ★ 2026-11-02（用户："常用词汇要支持选择删除多选，当前的很多没有用的"）：
-    /// 批量删除。一次 persist——清几十上百个自动挖出来的废词只写一次盘。
     func remove(words: Set<String>) {
         guard !words.isEmpty else { return }
         entries.removeAll { words.contains($0.word) }
@@ -169,19 +152,6 @@ final class VocabularyStore: ObservableObject {
         let sources: [String]
     }
 
-    /// n-gram 频次挖掘。朴素但有效：转写里反复出现 ≥3 次的 2–4 字连续片段，
-    /// 滤掉含标点/数字/空白和常见虚词的，按频次排序。来源取该词出现最多的前 3 篇。
-    ///
-    /// ★ 2026-10-30（用户："常用词需要是那种网络热词……『不要』『不能』『这个』
-    /// 我这种词汇也算作归纳为常用词……结合一下相关行业的词汇进来，可以分析
-    /// 一下其他相关的项目常用词的逻辑"）：两路改动——
-    /// ① **虚词黑名单大幅扩容**（见 `stopGrams`：代词/助词/能愿动词/口语填充
-    ///    全部拉黑），挖出来的不再有「不要」「不能」「这个」这类废词；
-    /// ② **词库直查**（`hotwordLexicon` + `industryLexicon`）：参照讯飞听见/
-    ///    讯飞 ASR 的个性化热词分层思路（个人热词 / 行业词 / 热词库导入，
-    ///    命中即提升权重），把网络热词与科技/互联网/职场行业词建成内置词库，
-    ///    在转写里**出现过哪怕一次**就收进词表并标注来源——词库里放着的就是
-    ///    「该认识的词」，出现即值得提示，不需要凑满 n-gram 的频次门槛。
     static func mineTranscripts(existing: Set<String>) -> [MinedCandidate] {
         let fm = FileManager.default
         let dir = StorageLocations.decryptedDir
@@ -314,12 +284,6 @@ final class VocabularyStore: ObservableObject {
         "对不对", "好不好", "行不行", "可以吗", "对吧", "是吧", "好吗",
     ]
 
-    /// ★ 2026-10-30（用户："常用词汇是那种比较专业的……『能够个』这类不能算"）：
-    /// **子串级**过滤——候选 n-gram 只要*包含*下面的虚词组合就直接扔掉。
-    ///
-    /// 上一版只做整词匹配，「能够个」「不能算」这类因为不等于黑名单词条而漏网。
-    /// 这里收录的都是"出现在任何更长片段里都足以判废"的虚词大片段
-    /// （代词、能愿、连词、指代），真专名几乎不可能包含它们。
     private static let stopSubstrings: Set<String> = [
         "能够", "不能", "不会", "不要", "不得", "没能", "不用",
         "这个", "那个", "这种", "那种", "哪种", "这么", "那么",

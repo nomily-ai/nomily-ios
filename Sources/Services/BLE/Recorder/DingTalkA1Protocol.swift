@@ -7,10 +7,7 @@ private let log = Logger(subsystem: "com.nomily.app.ios", category: "ble.dingtal
 
 // MARK: - DingTalk A1 wire protocol
 //
-// Everything in this file was measured on a real card (`SN 2010A1K262001N000655`,
-// firmware `V1.6.98-202608262232`) and is written down in
-// the A1 reverse-engineering notes §2 / §14. Nothing here is a guess;
-// the two places where an assumption remains are called out explicitly
+// The two places where an assumption remains are called out explicitly
 // (`DingTalkA1FileIndex`, `DingTalkA1Audio.recordPrefixLength`).
 //
 // ## Shape of the link

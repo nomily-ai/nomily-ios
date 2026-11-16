@@ -1,43 +1,5 @@
 import Foundation
 
-// MARK: - State machine for TicNote Wi-Fi fast transfer (pure logic, no dependency on Network / CoreBluetooth)
-//
-// Isomorphic to the BLE path (`TicNoteSession`), for the same two reasons:
-//   1. **Verifiable** -- an `NWListener` can't be created on the command line, so once protocol logic is welded onto it, only manual testing on a real device is possible;
-//   2. **Testable** -- the state machine is push-based: feed one `TicNoteWifiFrame`, get back "which frames to send next".
-//      So self-check §20 can run the whole handshake → list → download → assemble on a machine without a network.
-//
-// ## Direction (the most important correction of this round, see the top of `TicNoteWifiProtocol.swift`)
-// **We are the server.** So this state machine's starting point is not "I connected", but
-// "**the card connected in, and it speaks first**":
-//
-//   card → 2 SAY_HELLO
-//   me → 1 HANDSHAKE {"stamp","token"}
-//   me → 11 GET_FILE_LIST {"single","start","uid"}   ← ★ 11, not 20 (see TicNoteWifiCmder)
-//   card → 11 list reply (json + bin)
-//   me → 12 FILE_SYNC {"end","scene","session","start"}  ← ★ 12, not 19
-//   card → 13 content chunk × N (json + bin)
-//   me → 14 FILE_DELETE {"scene","session"}   ← ★ only when "auto-delete after transfer" is on; **while the session is still alive**
-//   me → 4 WIFI_CLOSE {"status":1}   (wrap-up; if not sent the card's hotspot stays on and drains battery)
-//
-// ★ Why delete comes after 13 and before 4 (decided 2026-10-12): the only delete command proven by the official code
-//   is this Wi-Fi `cmder 14` (`WifiPlugin.cleanFile`). The BLE `0x1E` has never received
-//   an ack, and on the real device 1.3 s after sending it the card's BLE connection timed out and dropped. Once the session closes there is nowhere to send 14,
-//   so it must squeeze into the short stretch between these two numbers; `ingest` therefore also moves the 14 ack ahead of the terminal-state check.
-//
-// ## What is **certain** from the official code, and what is **inferred**
-// Certain (`WifiPlugin.java` can point to the lines): cmder direction and semantics, the JSON field names of each request,
-//   the handshake going first (the card sends 2 first), the completion criterion (bytes written ≥ fileSize), resume using the same cmder 12.
-// Inferred: **⑪ the order among the three requests** has no official timing to compare with (the official side is Dart-layer scheduling,
-//   and that part didn't survive in the decompiled output), so it is arranged in the "least surprise" order:
-//   handshake → ask for list → ask for file. Plus the value semantics of `single` / `uid` / `scene`.
-//   All three are marked separately in the comments of self-check §20.
-//
-// ## Why the completion criterion is "bytes ≥ fileSize", not "received some end frame"
-// The decompiled official `saveFileData` has an `if (r12 >= r3.longValue())` branch
-// (`r3` = `this.fileSize`), meaning **it itself judges completion by byte count**.
-// This is more reliable than waiting for an end frame that may be dropped: a dropped end frame → never arrives → timeout;
-// judging by byte count → proceeds as soon as the data is complete, so it can't hang.
 
 final class TicNoteWifiSession {
 

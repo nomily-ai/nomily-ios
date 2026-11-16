@@ -4,24 +4,8 @@ import UIKit
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "diagnostics")
 
-/// ★ 2026-10-30（用户："诊断报告导出…用户方便导出日志反馈给我们"）
-///
-/// 一键把「诊断日志 + 设备/版本信息」打包成一个文本文件，走系统分享面板
-/// 发给开发者（邮件 / AirDrop / 微信都行）。
-///
-/// 内容边界（写进文件头，用户看得见）：
-///   · **包含**：`Documents/ticnote-ble.log`（+ 滚动出来的 `.1`）——蓝牙帧、
-///     Wi‑Fi 传输、ASR/LLM 调用的错误流水；设备型号 / 系统版本 / App 版本。
-///   · **不包含**：录音音频、转写正文、API 密钥、定位等隐私（日志只记控制
-///     帧与错误行，语音帧在 `TicNoteDiagLog` 里本就只记首帧计数）。
 enum DiagnosticsExporter {
 
-    /// 生成报告文件（Documents 下，用户可在文件 App 里直接看到），返回 URL。
-    ///
-    /// ★ 2026-11-02（用户："设置页加一个日志反馈的入口，方便导出日志给我们分析，
-    /// 以及配合对应截图"）：支持可选的**用户问题描述**（写进文件头）与
-    /// `includeLogs` 开关；反馈页用 `Nomily-Feedback-…` 前缀，关于页的
-    /// 诊断导出保持默认调用不变。
     static func export(description: String? = nil, includeLogs: Bool = true,
                        fileNamePrefix: String = "Nomily-Diagnostics") -> URL? {
         let fm = FileManager.default

@@ -422,12 +422,6 @@ final class BluetoothCoordinator: NSObject, ObservableObject {
         return try await scanAndConnectRecorder(recordID: recordID, nameHint: nameHint, timeout: timeout)
     }
 
-    /// Pure scanning legacy path (fallback when fast path is unavailable). Behavior is **identical word‑for‑word** to the pre‑change version.
-    ///
-    /// ★ 2026-10-27（用户："设备列表点安克录音豆不切换"）：录音豆的广播 MAC 是
-    /// RPA（每次轮换），iOS 的 `CBPeripheral.identifier` 跟着地址走，所以按
-    /// recordID 匹配会在地址轮换后永远扫不到 → 100 s 超时。对 D3200 追加
-    /// **归一化产品名**（mergeKey）匹配——与扫描去重同一把尺子。
     private func scanAndConnectRecorder(
         recordID: String,
         nameHint: String? = nil,
@@ -1023,12 +1017,6 @@ final class BluetoothCoordinator: NSObject, ObservableObject {
         // heuristic when `deviceEncryptionOn` stays nil.
         _ = try? await client.getEncryptionState()
 
-        // ★ 2026-11-04（用户："在 Nomily 链接的时候增加检查密钥当前是否符合，否则
-        //   导致录音能够传输但是无法解密"）：连接完成就把"钥匙对不对"判出来。
-        //
-        //   放在这里而不是下载时：这是唯一一个**所有**连接路径都会经过的点
-        //   （首次连接、重连、自动重连），而且恰好就在 0xA3 读完的下一秒。
-        //   判定本身是纯本地的（Keychain + 已存的 KCV），不会拖慢连接。
         await KeyHealthService.shared.evaluate(client: client)
     }
 

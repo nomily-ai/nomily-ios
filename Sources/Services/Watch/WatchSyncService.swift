@@ -76,8 +76,6 @@ final class WatchSyncService: NSObject, ObservableObject {
         pushCurrentContext(allDay: on)
     }
 
-    /// ★ 2026-11-06（用户："手表这边可以增加一个表情常亮…设置在 app 里面"）：
-    /// 手表上次回报的常亮开关值；`nil` = 还没收到过。
     @Published private(set) var watchAlwaysOnFace: Bool?
     /// 手机上用户最后一次设置的值；`nil` = 手机上从来没动过（显示跟手表走）。
     private static let phoneAlwaysOnFaceKey = "watch.always_on_face.phone.v1"
@@ -475,13 +473,6 @@ final class WatchSyncService: NSObject, ObservableObject {
             context[WatchLinkMessage.voiceprintResultIDKey] = result.id
             context[WatchLinkMessage.voiceprintResultKey] = result.ok
         }
-        // ★ 2026-10-30：定时录音命令随完整上下文一起走（持久化了，所以手机
-        // 重启后的任何一次推送都会带上）。
-        // ★ 2026-11-06（全天候语义，用户："重新开的手机 Nomily 就中断了"）：
-        // 只带**新鲜**的命令——这里持久化的是"最后一条"，可能是一条陈年的
-        // "stop"，手机重启后的重放曾把手表正在录的全天候录音停掉（手表端
-        // 已加 issuedAt 去重兜底，这里再把源头掐掉）。15 分钟以外的命令对
-        // "定时录音窗口"早已没有意义，不再随上下文走。
         if let command = Self.loadTimedCommand(),
            Date().timeIntervalSince(command.issuedAt) < 15 * 60 {
             context[WatchLinkMessage.timedRecordCommandKey] = command.command
@@ -540,10 +531,6 @@ final class WatchSyncService: NSObject, ObservableObject {
     // push, and so a recap survives this app being killed before WCSession
     // accepts the context.
 
-    /// ★ 2026-10-30（用户："回顾里能看到待办这个为啥只能存 5 条？这个需要优化"）：
-    /// 一条回顾最多带多少条待办。原来是硬编码 5 条，长会议（十几条行动项）会被截断，
-    /// 手表上就"看不到最后那几条"——现在放到 30，够一小时的会用量，手表详情页
-    /// 本身是可滚动的，多几条不影响观感。
     static let recapTodoLimit = 30
 
     private static let recapOutboxKey = "watch.recap.outbox.v1"
@@ -559,13 +546,6 @@ final class WatchSyncService: NSObject, ObservableObject {
         var frameVisible: Bool
     }
 
-    /// Called by the summarize runner when a summary lands. Fire-and-forget.
-    ///
-    /// ★ 2026-10-30（用户："回顾摘要要支持在手机设置里面支持设置，在里面可以查看到
-    /// 待办"）：两个变化——
-    /// ① `todos`：摘要里明确承诺的待办随回顾一起推给手表（最多 5 条），手表详情页
-    ///    列出来，点一下就能同步进手机的「提醒事项」；
-    /// ② 设置里的开关关掉时**什么都不推**（连队列都不写），避免用户关了还在腕上看到。
     func pushRecap(
         clipName: String,
         title: String,
@@ -611,17 +591,6 @@ final class WatchSyncService: NSObject, ObservableObject {
 
     // MARK: - 历史摘要回填（★ 2026-11-04）
 
-    /// 把**手机上已经存在的摘要**补进回顾 outbox。
-    ///
-    /// 为什么需要它：`pushRecap` 只在"摘要刚刚生成"那一刻推一条，outbox 也只从那时开始攒。
-    /// 把上限从 8 提到 30（用户："右滑的最近要能看到 30 条"）之后，一个装了很久的
-    /// 用户照样只能看到自己那 8 条——旧摘要从来没进过队列，不是被裁掉的。
-    /// 于是这里从磁盘扫一遍：最近 30 天、按录音名倒序、有 `.summary.md` 的录音，
-    /// 用与实时推送**完全相同**的提取链（`JobRunners.recapDigest` + `TodoExtract`）重建条目。
-    ///
-    /// 只做"填空"：outbox 已经满了就直接返回，所以正常情况下每次启动只是
-    /// 一次目录列举 + 一个 `count` 比较，没有额外开销；而新用户先装了 App、
-    /// 过几天才配对表时，那批摘要也能在激活那一刻补进来。
     func backfillRecapsIfNeeded() {
         guard config.config.watchRecapEnabled else { return }
         let current = loadRecapOutbox()
@@ -867,10 +836,6 @@ extension WatchSyncService: WCSessionDelegate {
         Task { @MainActor in self.apply(watchState: applicationContext) }
     }
 
-    /// ★ 2026-10-30（用户："支持在手表里面点击可以同步到手机的待办里面"）：
-    /// 手表 Recap 详情里点了一条待办，走 `transferUserInfo` 送到这里。
-    /// 写进系统「提醒事项」——权限没给就静默失败（手表端已经打了确认触感，
-    /// 设置页的开关那行才是处理授权的地方）。
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         guard let title = userInfo[WatchLinkMessage.reminderTitleKey] as? String,
               !title.isEmpty else { return }
@@ -895,9 +860,6 @@ extension WatchSyncService: WCSessionDelegate {
             ?? file.fileURL.lastPathComponent
         let safeName = requested.replacingOccurrences(of: "/", with: "-")
 
-        // ★ 2026-11-04（用户："需要在 Apple Watch 里面加入一个声纹"）：
-        // 手表传上来的还有**声纹样本**——它是注册用的素材，不是一条录音，
-        // 绝不能进 Library，也不能触发转写。
         if (file.metadata?[WatchLinkMessage.voiceprintKey] as? Bool) == true {
             // ★ 2026-11-06：注册完给手表一条回执（成败都回）——旧行为里手表
             // 发完样本只能停在"已发送"，没有下文。结果随下一次上下文推回。

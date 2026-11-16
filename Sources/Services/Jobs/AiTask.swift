@@ -3,13 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "ai-task")
 
-/// The stage machine of one "transcribe + summarize" pipeline (任务三).
-///
-/// Stages: `queued → transcribing → summarizing → done`, failure ends in
-/// `failed` carrying **which stage** died. `uploading` of Plaud's model has
-/// no Nomily counterpart — transcription here is a local file, nothing is
-/// uploaded first — so it is deliberately absent rather than modelled as a
-/// stage that never runs.
 enum AiTaskStage: String, Codable, Equatable {
     case queued
     case transcribing
@@ -55,12 +48,6 @@ struct AiTask: Codable, Identifiable, Equatable {
     }
 }
 
-/// The retry cooldown gate (任务三): exponential backoff, capped at 30 min.
-///
-/// Plaud's `retry_cooldown_gate` exists to stop a poisoned pipeline from
-/// hot-looping against a failing cloud service. Nomily's transcription
-/// already has its own 3-attempt queue, so this gate governs **whole-pipeline
-/// re-entry** — auto-flow retriggering or the user tapping retry again.
 enum RetryCooldownGate {
     /// 1 → 60 s, 2 → 120 s, 3 → 240 s … capped at 30 min.
     static func cooldown(afterAttempt attempt: Int) -> TimeInterval {
@@ -75,30 +62,6 @@ enum RetryCooldownGate {
     }
 }
 
-/// The unified ledger + orchestrator for "transcribe → summarize" pipelines
-/// (任务三, ★ 2026-10-22).
-///
-/// ## Where it sits (deliberate layering)
-/// `JobQueue`'s header already rules: **what's shared is the task-overview
-/// layer, not the scheduling layer** — transcription keeps
-/// `TranscriptionService` (persisted queue, dedupe, ASR-specific retries) and
-/// summary/translation keep `JobQueue`. Ripping those apart would lose
-/// battle-tested semantics. So `AiTaskCenter` is the **orchestration +
-/// observability ledger** above them:
-///
-/// * every pipeline gets one `AiTask` row whose stage advances with the real
-///   queues (`onTranscribed` → summarizing; `JobQueue.wait` → done);
-/// * re-entry is gated by `RetryCooldownGate`;
-/// * the ledger is persisted (`ai-tasks.json`) and **recovered at launch**:
-///   a task interrupted by a process kill is reconciled against what the
-///   underlying queues actually produced.
-///
-/// ## Honest boundaries
-/// Transcription **failures** are not signalled by `TranscriptionService`
-/// today (it has only `onTranscribed`); a task whose transcription never
-/// lands is therefore resolved at launch-recovery / by the next reconcile,
-/// not the moment the recogniser errors. The underlying queue's own row in
-/// the task center stays the source of truth for the failure text.
 @MainActor
 final class AiTaskCenter: ObservableObject {
 

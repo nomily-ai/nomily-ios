@@ -6,7 +6,7 @@ import UserNotifications
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "card-finder")
 
-/// "Find my card" fallback that needs **no firmware support** (任务八 · 8.1).
+/// "Find my card" fallback that needs no firmware support.
 ///
 /// ## Why it exists
 /// Plaud ships Apple Find My and nothing else; there is no BLE beep command in

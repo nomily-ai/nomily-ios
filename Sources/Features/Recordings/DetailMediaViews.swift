@@ -316,9 +316,6 @@ enum TodoExtract {
         "待确认", "待定", "未决", "风险", "背景", "说明", "概述", "议程", "总结", "结论",
     ]
 
-    /// ★ 2026-10-30（用户："待办事项需要根据摘要识别精准"）：不是待办的句子踢掉。
-    /// 模板在行动项下面常跟着"备注：…""以上事项待确认""暂无"这类**说明性**行，
-    /// 以前被当成待办列出来，用户勾了半天发现勾的是废话。
     static let noisePrefixes = [
         "备注", "注：", "注:", "说明：", "说明:", "提示：", "提示:",
         "以上", "以下", "暂无", "总计", "合计", "—", "-", "（", "(",
@@ -591,8 +588,6 @@ struct TodoChecklistView: View {
     @State private var done: Set<String> = []
     /// ★ 2026-10-29：本次进入页面新同步进「提醒事项」的条数（0/nil = 没有新增）。
     @State private var remindersCreated = 0
-    /// ★ 2026-10-30（用户："待办支持手写待办不只是总结出来的待办"）：用户自己加的行。
-    /// 存在 UserDefaults 里（key 按录音名），跟着录音走，重新生成摘要也不会丢。
     @State private var manual: [String] = []
     /// 输入框草稿。
     @State private var newTodo = ""
@@ -605,18 +600,12 @@ struct TodoChecklistView: View {
         !(UserDefaults.standard.stringArray(forKey: "todo.manual.\(recordingName)") ?? []).isEmpty
     }
 
-    /// ★ 2026-10-29（用户："待办支持同步到 iPhone 里面的待办"）：开关打开时，
-    /// 进待办列表就把行写进系统「提醒事项」（幂等：已建过的行不会重复）。
     private var remindersSyncOn: Bool { configService.config.remindersSyncEnabled }
 
     /// 已完成的那一组默认收起。
     @State private var showCompleted = false
 
     var body: some View {
-        // ★ 2026-11-03 九轮（用户："APP 里面的待办展示太凌乱"）：
-        //   旧版把所有东西平铺在同一个 8pt 间距的 VStack 里——标题行、未勾的、
-        //   已勾的、手写的、输入框、提醒事项脚注首尾相接，视线找不到起点。
-        //   现在按"进度 → 未完成 → 已完成（收起）→ 添加"分层，每层只有一件事。
         VStack(alignment: .leading, spacing: 0) {
             if totalCount > 0 { progressHeader.padding(.bottom, 10) }
 

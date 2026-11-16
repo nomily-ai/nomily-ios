@@ -371,13 +371,6 @@ final class SummarizeTemplateStore: ObservableObject {
                 renamed.name = newName
                 return renamed
             }
-            // ★ 2026-11-05（用户："中文界面模板里面为啥是英文"）：存档里的内建模板
-            // 此前只增不改——旧版本存下的内建项（旧名字、旧 prompt 文案）永远留在
-            // 存档里，而本地化是按**名字**查键的：名字对不上映射表的旧条目就整条
-            // 显示英文。现在改为**代码默认值整体替换存档内建项**：名字/prompt/图标
-            // 永远跟当前代码一致（本地化键必然命中），自定义模板原样保留；
-            // 存档里已不存在于代码的内建项（如更名前的 Plaud 旧名）随之清掉。
-            // storeKey = (category, name)，用户选中的默认模板键不受影响。
             let storedCustoms = migrated.filter { !$0.isBuiltIn }
             var merged = Self.defaults
             merged += storedCustoms
@@ -834,9 +827,6 @@ final class SummarizeTemplateStore: ObservableObject {
             """
         ),
 
-        // Medical
-        // ★ 2026-10-30（用户："录音模板那个 ADHD 的模板需要有"）：ADHD 友好输出
-        // ——短块、前置结论、行动优先，给注意力有限的读者看的整理方式。
         SummarizeTemplate(
             category: "Medical",
             name: "ADHD Friendly Summary",

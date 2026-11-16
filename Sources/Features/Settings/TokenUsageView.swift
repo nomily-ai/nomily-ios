@@ -1,14 +1,5 @@
 import SwiftUI
 
-/// ★ 2026-10-28（饭耳逆向规格 §1.2「每日 token 用量热力图」）：
-/// GitHub 贡献图式的用量日历——颜色深浅 = 当天大模型消耗，点格子看当天明细。
-///
-/// 数据来自 `TokenUsageStore`（字符 × 0.62 的**估算** token，用于看趋势；
-/// footer 把这条口径如实写给用户，不假装是账单）。
-///
-/// ★ 2026-10-29（用户："AI 用量统计放到大语言模型服务里面去不要单独做一个"）：
-/// 内容拆成 `TokenUsageContent`（可嵌进任意 Form Section / VStack），
-/// 独立整页视图保留但不再挂载——热力图现在住在大模型页顶部。
 struct TokenUsageView: View {
     var body: some View {
         ScrollView {

@@ -36,8 +36,7 @@ import Foundation
 // container's sample-rate field. That mismatch is not a bug to "fix": the field describes
 // what the encoder was fed, while Opus always counts time at 48 kHz.
 //
-// The conversion is a straight port of the verified Python tool
-// (the A1 reverse-engineering `tools/dtyj_to_ogg.py`, byte-identical output on real samples), because
+// The conversion follows a verified reference implementation, because
 // getting Ogg's CRC or lacing wrong produces a file that opens in a player and then stops
 // at the first page boundary — the kind of failure that looks like "the card recorded noise".
 

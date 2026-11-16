@@ -4,24 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "quality")
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.2 录音质量 + 冷数据降级）
-///
-/// Four bitrate tiers (the spec's sizes are speech-AAC approximations —
-/// "原样 29MB/h" is what 64 kbps mono already costs us) plus the cold-data
-/// downgrade pass: recordings older than N days get re-encoded in place to the
-/// selected tier, **after** their transcript exists. Original quality is what
-/// transcription runs against; the downgrade only ever trades playback
-/// fidelity the user explicitly opted out of.
-///
-/// Safety rails, all deliberate:
-///   · Never touch a clip whose transcript hasn't landed — transcription is
-///     the reason the audio is kept at full fidelity in the first place.
-///   · Skip when the current effective bitrate is already within ~15% of the
-///     target (re-encoding an already-small file costs time, saves nothing).
-///   · Transcode to a temp file first and only replace the original when the
-///     result is genuinely smaller — a failed or degenerate encode must never
-///     be able to destroy the source.
-///   · `asIs` (the default) means the pass is a no-op entirely.
 enum RecordingQualityTier: String, CaseIterable, Codable, Identifiable {
 
     case asIs       // 原样 — no re-encode
@@ -82,16 +64,6 @@ final class RecordingQualityService: ObservableObject {
     /// Human-readable result of the last pass, shown under the button.
     @Published var lastReport: String?
 
-    /// The cold-data pass. Called at launch (when the switch is on) and from
-    /// the "run now" button (`ignoreSwitch` for the button so a user can run it
-    /// without leaving the toggle on).
-    ///
-    /// ★ 2026-11-02（用户："录音质量（转写后）应该只是单独控制手表的，而不是
-    /// 其他录音卡的质量"）：作用范围**只限手表录音**。手表片段落地时 manifest
-    /// 记了 `transport: "watch"`（WatchSyncService.recordDownload），据此用
-    /// `Library.source(forLocalName:).kind == .watch` 精确圈定候选；录音卡的
-    /// 片段（ble/wifi）与本机导入一律不动——卡的音频本来就是设备端压缩过的
-    /// 低码率流，再压一代只会白损音质。
     func runDowngrade(config: AppConfig, library: Library, ignoreSwitch: Bool = false) async {
         guard let tierRaw = config.recordingQualityTier,
               let tier = RecordingQualityTier(rawValue: tierRaw),

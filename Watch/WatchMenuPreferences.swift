@@ -28,21 +28,8 @@ enum WatchHomeMenu: String, CaseIterable, Identifiable, Codable {
     case history
     case language
     case settings
-    // The last one is the "can be added on" one.
-    //
-    // ★ 2026-11-03（用户："手表里面的回顾跟最近功能都是一样的" + "这个页面跟等待同步到
-    // iPhone 页面重复了"）：删掉 `.queue` 与 `.recap` 两个菜单项——
-    // · 「回顾」和首页第 2 页「最近」是同一份 `WatchRecapStore` 数据的两张皮，留一个（最近）；
-    // · 「待传队列」和第 3 页「同步」重复，队列内容已并入同步页（列表），左上角待传胶囊
-    //   也直跳同步页。旧值还留在 `UserDefaults` 里也没关系，`compactMap` 会把未知值丢掉。
     case about
-    /// ★ 2026-11-03 八轮（用户："全天候录音要能监控 APP 的电量消耗，加在菜单栏里"）：
-    /// 电量 / 耗电页。**默认不进菜单**（`defaultItems` 不含它），用户在手表「设置 →
-    /// 快捷菜单」里勾上才出现——老用户的首页不该突然多一行。
     case battery
-    /// ★ 2026-11-04（用户："需要在 Apple Watch 里面加入一个声纹，录制声纹说话"）：
-    /// 声纹录制页。**放进默认菜单**——这是一个需要用户主动做一次的动作，
-    /// 藏在"快捷菜单"设置里等于没人会做。
     case voiceprint
 
     var id: String { rawValue }

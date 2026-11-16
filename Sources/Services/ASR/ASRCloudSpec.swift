@@ -68,28 +68,16 @@ struct ASRCloudSpec: Identifiable, Equatable {
     let models: [String]
     /// Where the credential comes from.
     let console: String
-    /// ★ 2026-11-02（用户："该有对应配置页面点击跳转而不是要用户手动输入网址"）：
-    /// 控制台/创建 Key 页面的**可点链接**——`console` 里的文字路径告诉用户去哪，
-    /// 这个字段是真正的那扇门。nil = 没有稳定入口页。
     let consoleURL: URL?
     /// Vendor-specific caveat.
     let note: String?
 
-    // ★ 2026-10-29（饭耳规格 §1.1 价格/推荐元数据）：选型卡片的数据。
-    // 价格是公开刊例的粗略换算（"约"字辈），厂商随时调价——只是**选型参考**，
-    // 不是账单口径；没有把握的留 nil，UI 不显示。
     let pricePerHour: String?
     /// 厂商侧是否支持分说话人（说话人分离）。
     let supportsDiarization: Bool
     /// 选型建议短句："推荐 · 中文首选" / "偏贵" 等。nil = 中立。
     let recommendation: String?
 
-    /// ★ 2026-11-06（饭耳 1.0 移植 P0-2）：**准确率口径**——厂商公布的中文
-    /// CER / 英文 WER，形如「中文 CER 2.25% · 英文 WER 4.72%」。
-    ///
-    /// 为什么单独一个字段而不是塞进 `pricePerHour`：价格和精度是两个不同的问题
-    /// （"便不便宜"与"准不准"），混在一行里用户没法比较。有数据的厂商才显示，
-    /// 没有把握的一律 nil——**不编数字**，这条比"卡片看起来整齐"重要。
     var cerHint: String? = nil
 
     /// 价格 + 能力一行小字（"约 0.3 元/小时 · 分说话人"）。空 = 没有可靠数据。
@@ -99,13 +87,10 @@ struct ASRCloudSpec: Identifiable, Equatable {
         var parts: [String] = []
         if let localizedPrice { parts.append(localizedPrice) }
         if supportsDiarization { parts.append(L10n.ASRCloud.diarization) }
-        // ★ 2026-11-06（P0-2）：精度跟在价格后面——"约 0.1 元/小时 · 分说话人 ·
-        // 中文 CER 2.25%"正是饭耳卡片那一行的排法。
         if let localizedCerHint { parts.append(localizedCerHint) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    // MARK: - Localized display strings（★ 2026-11-02，用户："设置英语为系统语言但是好多中文的都没翻译过来"）
 
     /// spec 数据以中文撰写（主要受众），英文 UI 从 en.lproj 读 `asr.cloud.<id>.*`
     /// 键，键缺失时回落到这里的中文值——zh-Hans 不需要建键。
@@ -142,11 +127,6 @@ struct ASRCloudSpec: Identifiable, Equatable {
         recommendation?.hasPrefix("推荐") ?? false
     }
 
-    /// Tile colour, same shape as `LLMProviderSpec.tint`.
-    /// ★ 2026-11-02（用户："asr 的这些模型图标要按照 Apple Store 的 app 图标来"）：
-    /// 这批厂商的 `brandAsset` 已换成 App Store 官方 App 图标的**彩色位图**
-    /// （渲染时不能套 template/白色着色）。腾讯云没有官方移动 App，微信生态
-    /// 之外的 Deepgram / AssemblyAI / Gladia / Watson 也无消费级 App——保留单色瓦片。
     var usesAppStoreIcon: Bool {
         switch id {
         case "aliyun", "baidu", "xfyun", "google", "aws":
@@ -213,7 +193,6 @@ struct ASRCloudSpec: Identifiable, Equatable {
         pricePerHour: "约 0.1 元/小时（百炼 qwen-audio）",
         supportsDiarization: true,
         recommendation: "推荐 · 中文首选",
-        // ★ 2026-11-06（P0-2）：饭耳 1.0 卡片原文口径（FLEURS 测试集）。
         cerHint: "中文 CER 2.25% · 英文 WER 4.72%"
     )
 

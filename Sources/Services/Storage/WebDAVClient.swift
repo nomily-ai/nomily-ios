@@ -3,19 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "webdav")
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.3 存储分层 · WebDAV 目的地）
-///
-/// A minimal WebDAV client — just what backup needs: `PUT` a file,
-/// `MKCOL` the directories along the way, `PROPFIND Depth: 0` to test the
-/// server. Basic auth only (every NAS package the spec lists — 群晖/威联通/
-/// 绿联/飞牛/极空间/Nextcloud/坚果云 — speaks it; that's the point of picking
-/// WebDAV as the one protocol).
-///
-/// Uploads run on a plain `URLSession.shared` data task: the payloads are
-/// small text transcripts plus (optionally) audio, and the spec's background
-/// `URLSession` daemon path is a separate upgrade if users report big audio
-/// being killed mid-upload. Synchronous simplicity first; queue persistence
-/// comes free from "re-run the sync".
 struct WebDAVClient {
 
     struct Failure: LocalizedError {

@@ -21,8 +21,6 @@ struct AzureSpeechSheet: View {
 
     @State private var verify: VerifyState = .idle
     @State private var showHelp = false
-    // ★ 2026-11-03（用户："为啥 Azure 没有『让 ai 带你拿 key』这个"）：Azure 是
-    // 唯一漏掉 Key 快引导的转写服务商——其它云厂商的配置页都有，这里补齐。
     @State private var showKeyWizard = false
     /// Round trip of the last verify, so the test row can say "可用 · 1234 ms"
     /// even before the value is read back from `ASRLatencyMemory`.

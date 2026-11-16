@@ -14,32 +14,6 @@ private protocol SoundcorePcmSink: AnyObject {
     func discard()
 }
 
-/// D3200 raw Opus frames → 可直接播放的音频文件（AAC/m4a，WAV 兜底）。
-///
-/// ## ★ 2026-10-27 第三次返工（用户："传输过去的录音都是 0s…里面的录音听着也有问题"）
-///
-/// 上一版走的是 PlaudBleSDK 的 `Mp3Convert.convertOgg:toMp3:`，两条硬伤都被真机证实：
-///
-///  1. **声音不对**：`Mp3Convert` 是给 PLAUD 卡的 Ogg 调的（16 kHz / 80 B 帧），
-///     豆是 48 kHz / 160 B 帧，同一段容器喂进去解出来的采样率/节奏都不对；
-///  2. **时长 0 s**：它输出的 mp3 是无 Xing/LAME 头的 VBR，`AVURLAsset`
-///     读不出时长，`AVAudioFile` 也打不开这类畸形文件 —— 列表只能显示 0s。
-///
-/// 现在的做法是**彻底不走容器**：豆的离线/实时流本来就是裸的定长 Opus 帧
-/// （160 B = 20 ms @48 kHz mono CBR，见 `SoundcoreOgg`），直接逐帧喂 SDK 自带的
-/// `JXOpusDecoder`——注意它按 **80 B × 声道数**切包（头文件原文），所以必须
-/// `channels: 2` 才能整包吃下 160 B 单声道帧，解完降混回单声道（PLAUD 实时
-/// 链路天天在用这条解码链），得到 PCM 后自己封装成 **AAC/m4a**：
-///
-///  - m4a 有真实的时长/采样率元数据 → 列表时长正确、AVPlayer 全系统版本可播；
-///  - ASR 上传接受 m4a（和 mp3 同级），转写链路不用改；
-///  - 采样率**实测**得到（第一帧解出来的样本数 × 50 = 每秒帧数），不假设
-///    JXOpusDecoder 内部固定输出 16 kHz 还是 48 kHz；
-///  - 按 OpusHead 声明的 preskip（3840 @48 kHz，等比换算）丢掉开头样本，
-///    和 `SoundcoreOgg` 的封装口径保持一致，时长 = 解码样本数 / 采样率。
-///
-/// 全程失败时返回 nil，调用方回落到 `.opus`（iOS 17 可播、转写不受影响）——
-/// fail-open，绝不因为转码把已经拉下来的录音弄丢。
 enum SoundcoreTranscoder {
 
     /// 转码结果：可播放字节 + 落盘后缀 + 精确时长。
@@ -72,11 +46,6 @@ enum SoundcoreTranscoder {
         return transcode(frames: frames, preskipAt48k: preskipAt48k)
     }
 
-    /// ★ 2026-11-02（用户："当前系统版本无法播放 opus 录音"）：通用帧流入口——
-    /// 录音卡片（A1 等）的裸 20 ms Opus 帧也走同一条解码链，落盘即转 m4a，
-    /// 不再依赖 iOS 17 的 Ogg 解码器（iOS 16 / Ogg 解析失败的组合全都可播）。
-    /// 帧长必须是 80 B（单声道解码）或 160 B（双声道解码整包吃下）。
-    /// `preskipAt48k`：源头在 OpusHead 里声明的 pre-skip（A1 为 0，豆 3840）。
     static func transcode(packets: [Data], preskipAt48k: Int = 0) -> Output? {
         guard let first = packets.first, !first.isEmpty else { return nil }
         return transcode(frames: packets, preskipAt48k: preskipAt48k)

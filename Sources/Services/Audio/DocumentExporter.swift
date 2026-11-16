@@ -4,20 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "doc-export")
 
-/// Text / Markdown / PDF / mind-map-PNG generation for the export chain
-/// (★ 2026-10-22, 任务二).
-///
-/// ## Scope (from the task book)
-/// Plaud's evidence: `export_share_telemetry.dart` + the workflow action
-/// `Workflow_send_email_attachments_{summary|transcription|mindmap}` — the
-/// email-with-attachments trio is their proven high-frequency need. The
-/// document formats here feed both the export queue (`JobRunners.export`)
-/// and the mail composer's attachment picker.
-///
-/// ## File locations
-/// The audio runner already stages exports inside `ExportCenter`'s staging
-/// dir; this file only produces `Data`/files **on request** — staging and
-/// the "ready to share" ledger stay in `ExportCenter`.
 @MainActor
 enum DocumentExporter {
 

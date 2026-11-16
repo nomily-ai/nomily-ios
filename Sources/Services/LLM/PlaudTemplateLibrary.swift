@@ -1,13 +1,6 @@
 import Foundation
 
-/// Templates modelled on **Plaud's own product**, captured from the vivo
-/// handset on 2026-10-23 (screenshots under
-/// `TicNote/03-逆向/PLAUD/android-re/screens/vivo-2026-10-23/`).
-///
-/// Plaud's split, in their own words: *summaries for quick overviews,
-/// extraction notes for key insights like quotes or numbers, and actionable
-/// outputs like to-do lists and follow-ups.* Their 会议纪要 tile says
-/// "生成完整清晰的会议纪要，含行动与决策".
+/// Built-in templates for overview, extraction, and action-oriented notes.
 ///
 /// These four are **prepended** to `SummarizeTemplateStore.defaults`, which has
 /// two consequences by design:

@@ -141,21 +141,7 @@ but they do have to be installed and started on a computer that shares the phone
 If that sounds like sysadmin work, let an AI do it: open **ChatGPT** or **Claude Code** on
 that computer, paste the prompt below, and let it install, write and start everything.
 When it finishes it prints the exact values to type into the app. The same prompt is
-copyable from inside the app: **Settings → 转录 → Local ASR server → 复制 AI 配置助手提示词**.
-
-<details>
-<summary><strong>复制这段话给 ChatGPT / Claude Code（中文）</strong></summary>
-
-```text
-请帮我把这台电脑部署成 Nomily AI 录音 App 的本地语音服务，做完后把要填进 App 的信息打印给我。分三步：
-第一步，安装并启动 Ollama，设置开机自启并允许局域网访问（OLLAMA_HOST=0.0.0.0），再拉一个适合本机内存的中文对话模型（内存 8G 用 qwen2.5:3b，16G 及以上用 qwen2.5:7b）。
-第二步，用 pip 安装 faster-whisper，写一个 Python 服务（FastAPI + uvicorn + websockets）并在后台常驻（macOS 用 launchd，Windows/Linux 用 systemd 或任务计划），同时放行防火墙的 12300 和 12301 端口。它要实现两个接口：
-· HTTP 批量转录：监听 12301 端口，POST /v1/transcribe，请求体是原始音频字节（Content-Type: application/octet-stream，一般是 Ogg-Opus 容器，用 faster-whisper 直接解码），返回 JSON：{"text": "完整文本", "segments": [{"start": 开始秒, "end": 结束秒, "text": "分段文本"}]}。
-· WebSocket 实况流：监听 12300 端口，路径 /v1/listen。客户端会持续发来等长的 Opus 裸包（二进制帧，不带容器头，需要按固定包长拼接解码成 PCM 再喂给 faster-whisper 的 VAD 流式识别），服务器每识别出一段就用 JSON 文本帧回发 {"text": "这段文字", "is_final": true 或 false}；收到 {"type":"CloseStream"} 文本帧时冲刷剩余音频、补发最后一段，然后关闭连接。
-第三步，全部跑通后打印四行信息：① 这台电脑的局域网 IP（用 ifconfig 或 ipconfig 查，192.168 或 10 开头的那个）；② Nomily AI「设置 → 转录 → 本地 ASR 服务」里要填的主机名（就是上面的局域网 IP）；③ 该页要填的端口（固定填 12300）；④ 「设置 → AI 服务 → Ollama」里要填的地址（http://局域网IP:11434）和模型名。最后提醒我：手机和电脑必须连同一个 Wi-Fi，App 两个页面里的验证按钮都通过才算部署成功。
-```
-
-</details>
+copyable from inside the app under **Settings → Transcription → Local ASR server → Copy setup prompt**.
 
 <details>
 <summary><strong>The prompt (English)</strong></summary>
@@ -175,8 +161,8 @@ Set up this computer as the local speech backend for the Nomily AI recorder app,
 
 | Settings page | Field | Value |
 |---|---|---|
-| 设置 → 转录 → Local ASR server | Host / Port | the computer's LAN IP / `12300` |
-| 设置 → AI 服务 → Ollama | Endpoint / Model | `http://<LAN-IP>:11434` / e.g. `qwen2.5:3b` |
+| Settings → Transcription → Local ASR server | Host / Port | the computer's LAN IP / `12300` |
+| Settings → AI Providers → Ollama | Endpoint / Model | `http://<LAN-IP>:11434` / e.g. `qwen2.5:3b` |
 
 Then tap both **verify** buttons — a green result is the whole deployment check. The port
 convention is fixed: `12300` is the live WebSocket, batch transcription rides `12301`

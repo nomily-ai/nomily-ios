@@ -22,11 +22,6 @@ packages:
   Argon2Swift:
     url: https://github.com/tmthecoder/Argon2Swift.git
     branch: main
-  # ★ 2026-11-02（用户："增加一个下载使用 SenseVoice 的语音转文字"）：
-  # sherpa-onnx 运行时（静态链接，内含 onnxruntime）。**本地 vendored 包**
-  # （VendorPackages/sherpa-onnx-local）——远程 SPM 解析要从 GitHub release
-  # 拉 4 个 xcframework，直连国内超时全部失败，故把 iOS 静态二进制 +
-  # Swift wrapper 落进仓库。详见该包 Package.swift 头注释。
   SherpaOnnx:
     path: VendorPackages/sherpa-onnx-local
 
@@ -80,22 +75,12 @@ targets:
       # watchOS companion ships — it can't be installed on its own.
       - target: nomily_watch
         embed: true
-      # ★ 2026-10-21: the official PLAUD device SDKs (arm64 device builds,
-      # v1.0.15 from github.com/Plaud-AI/plaud-sdk-public). They own the
-      # Note Pro's encrypted BLE protocol (SN signature + RSA/ChaCha session)
-      # that our own RecorderLink layer can't do without partner credentials.
-      # `PlaudLink` (work in progress) wraps them behind `any RecorderLink`.
       - framework: Frameworks/PlaudBleSDK.framework
         embed: true
       - framework: Frameworks/PlaudDeviceBasicSDK.framework
         embed: true
       - framework: Frameworks/PlaudWiFiSDK.framework
         embed: true
-    # ★ 2026-10-29（用户："关于里的版本每次修改都没增加"）：每次构建把
-    # CFBundleVersion +1。
-    # ★ 2026-11-02：**已挪到方案级 `preActions`**（见文件上方 `schemes.nomily_ios.build.preActions`）——
-    # 放在这里时它跑在 `nomily_watch` 依赖**编译之后**，产出的 App 与内嵌手表 App
-    # 版本号会差 1，watchOS 会因此拒绝安装手表端。
     info:
       path: Sources/App/Info.plist
       properties:
@@ -129,11 +114,11 @@ targets:
         # 2026-10-27: extended for the soundcore Work D3200 (飞书录音豆) — its Wi‑Fi
         # fast transfer sends UDP keepalives and a WebSocket to the bean's own
         # SoftAP, which also triggers the local-network prompt on iOS 14+.
-        NSLocalNetworkUsageDescription: Nomily AI connects directly to your recorder (D·NOTE, TicNote, soundcore Work 飞书录音豆) over its Wi-Fi access point during Fast Transfer.
+        NSLocalNetworkUsageDescription: Nomily AI connects directly to your recorder over its Wi-Fi access point during Fast Transfer.
         NSMicrophoneUsageDescription: Live transcription monitors microphone state to coordinate with the device's stream.
         # Scans the QR code the A1 extractor prints on a Mac. The only thing the camera is used
         # for — it is never opened elsewhere, and no frame is stored or sent anywhere.
-        NSCameraUsageDescription: Nomily AI scans the QR code that carries a DingTalk A1 credential, so it never has to go through the clipboard.
+        NSCameraUsageDescription: Nomily AI uses the camera only when you choose to scan a supported configuration QR code.
         # ⛔ **Never remove this key.** `OnDeviceASR` / `OnDeviceLiveASR` link `Speech`, and the
         # first time `SFSpeechRecognizer.requestAuthorization` runs without this string in the
         # built Info.plist the system kills the process with a TCC namespace crash:
@@ -145,42 +130,23 @@ targets:
         # plist is silently reverted before the next build. The on-device recogniser runs
         # Apple's offline model; audio is not uploaded on this path.
         NSSpeechRecognitionUsageDescription: Nomily AI turns your recordings into text on this iPhone, using Apple's on-device speech recogniser. On that path the audio never leaves the device.
-        # 任务八 · 8.1 — "find my card". When a connected PLAUD card drops out of range the app
-        # records a **coarse** position (hundred-metre accuracy, one fix, only on that event) so
-        # "where did I last have it" has an answer. No continuous tracking, no background
-        # location, nothing uploaded. ⛔ `CLLocationManager.requestLocation()` without this key
-        # is a hard crash on iOS — same class of failure as the speech-recognition one above.
-        # 2026-10-22: the find-my-card page is shared by every recorder (TicNote,
-        # DingTalk A1, PLAUD), so the prompt must not name one brand.
         NSLocationWhenInUseUsageDescription: Nomily AI records a rough location when your recorder card disconnects, so it can tell you where you last had it. It asks for the position once, only at that moment, and never tracks you.
-        # ★ 2026-10-29 (用户："待办支持同步到 iPhone 里面的待办，需要打开这个开关"):
-        # EventKit Reminders — recording to-dos are written into the iOS Reminders app
-        # when the user flips the sync toggle. No entitlement needed, just usage strings.
-        # ★ 2026-11-02：这三条原本是**手写进 Info.plist** 的，`xcodegen generate` 一跑就被
-        # 抹掉了（plist 是由本文件生成的，只在 plist 里加 key 等于下次生成时自删）。
-        # 缺 key 的后果不是"降级"而是**进程被系统直接杀掉**（TCC namespace crash），
-        # 所以它们必须住在这里。
         NSLocationAlwaysAndWhenInUseUsageDescription: Nomily AI records a rough location when your recorder card disconnects, so it can tell you where you last had it. It asks for the position once, only at that moment, and never tracks you.
-        # ★ 2026-11-02 (用户："图片能不能再打开备注…"): 笔记里插入图片/视频要先把它存进临时目录
-        # 再读，iOS 会因为"访问了相册"弹权限。只在你主动选一张图时发生。
         NSPhotoLibraryUsageDescription: Nomily AI only opens your photo library when you choose a photo or video to attach. It never reads your library on its own.
         NSPhotoLibraryAddUsageDescription: Nomily AI saves an image or video to your photo library only when you ask it to.
         NSRemindersUsageDescription: Nomily AI can add the to-dos from your recording summaries to the Reminders app, so you never lose an action item. Nothing is read back unless you also tick them in Nomily.
         NSRemindersFullAccessUsageDescription: Nomily AI can add the to-dos from your recording summaries to the Reminders app, so you never lose an action item. Nothing is read back unless you also tick them in Nomily.
-        # `nomily-a1://import/<base64url>` — the deep link behind that QR code, and behind any
-        # tapped link. Handled in `NomilyApp.LocalizedRoot.onOpenURL`.
         CFBundleURLTypes:
           - CFBundleURLName: com.nomily.app.ios.a1
             CFBundleURLSchemes:
               - nomily-a1
+        # `nomily-a1://import/<base64url>` — the deep link behind that QR code, and behind any
+        # tapped link. Handled in `NomilyApp.LocalizedRoot.onOpenURL`.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UIBackgroundModes:
           - audio
           - bluetooth-central
-          # ★ 2026-10-29 (饭耳移植): BGProcessingTask for the night-shift backlog
-          # transcription. The identifier below must match
-          # NightlyTranscribeScheduler.taskIdentifier exactly, or submit() throws.
           - processing
         BGTaskSchedulerPermittedIdentifiers:
           - com.nomily.app.transcription.backlog
@@ -188,35 +154,6 @@ targets:
       path: Sources/App/nomily_ios.entitlements
       properties:
         com.apple.developer.networking.HotspotConfiguration: true
-        # ★ 2026-10-30：HealthKit 睡眠预填功能整体移除（用户："健康功能不是我们
-        # 的赛道"）——HealthKitSleepReader 与设置页按钮已删，此前"加 entitlement
-        # 需要 Xcode GUI 重签"的问题随之消失，不再需要。
-        # ⛔ **Deliberately NOT including** `com.apple.security.application-groups` (removed 2026-10-12).
-        #
-        # Two independent reasons, either one is enough:
-        #
-        # ① **It cannot be registered, and it also breaks Hotspot.** App Group IDs are **globally unique across teams**;
-        #    `group.com.nomily.app` is already taken by the earlier personal team `YW24F9VMC9` on this machine.
-        #    A failed registration makes Xcode fall back to a wildcard profile as a whole (`96S46YT5TP.*` does not include Hotspot),
-        #    so the error also gains the line "doesn't include the Hotspot capability" --
-        #    that is only a **side symptom**; the real cause is the App Group. (§3.1 records this investigation.)
-        #
-        # ② **It changes the data directory, effectively "hiding" the existing library.**
-        #    `StorageLocations.root` is "use the group container if available, otherwise fall back to the sandbox".
-        #    This app has **never** obtained the group container (it has always been the sandbox),
-        #    so once this entitlement actually takes effect, `root` would switch from the sandbox Documents to the group container,
-        #    and the user's library / config would **look completely empty** (the data is still in the sandbox, just no longer read).
-        #
-        # ## It is not needed at all right now
-        # It is only a hook left so that "future share / notification / audio extensions" can share one container.
-        # The watch pipeline does **not depend** on it -- the watch uses `WatchConnectivity`,
-        # and the source list of `nomily_watch` does not include `StorageLocations.swift`.
-        #
-        # ## If it is really added in the future
-        # Use a **team-unique** ID (e.g. `group.com.nomily.app.96S46YT5TP`, which already exists on the portal),
-        # **and** add a one-time migration in `StorageLocations` (group container empty while the sandbox has data
-        # → copy over), otherwise you get exactly the "library looks empty" problem in ② above.
-        # Never use `group.com.nomily.app` again -- it is held by another team.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nomily.app
@@ -298,14 +235,6 @@ targets:
         # there risks installd rejecting the bundle outright.
         UIBackgroundModes:
           - audio
-        # ★ 2026-11-03（用户："开会的时候录音自己关闭了"，全天候录音前置）：
-        #   纯 `UIBackgroundModes: audio` 挡不住 watchOS 的挂起策略——会话被
-        #   打断后（会议里通知/计时器/来电极常见），后台续录被系统拒绝，
-        #   App 随即挂起，任何重试梯子都没机会跑（manifest 里今天的录音全是
-        #   2~4 分钟的短片段，就是这个死法）。`HKWorkoutSession` 是 Apple 给
-        #   长时间后台录音的正规通道： workout 存续期间 App 不会被挂起，
-        #   麦克风保持在手。声明 workout-processing 后台模式 + HealthKit
-        #   权限（见 nomily_watch.entitlements）是它的两个前置条件。
         WKBackgroundModes:
           - workout-processing
         NSHealthShareUsageDescription: Nomily AI uses a workout session to keep background recording alive on your wrist. No health data is read.

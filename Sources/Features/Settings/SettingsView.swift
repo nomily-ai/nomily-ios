@@ -17,7 +17,6 @@ struct SettingsView: View {
     /// The number of items sitting in the trash is shown on the right of that row, so it has to be observed — delete
     /// one on the detail page and come back to the settings page, and the number has to follow.
     @ObservedObject private var trash = ClipTrash.shared
-    /// ★ 2026-11-06（饭耳 1.0 移植 P0-1）：待办看板入口的角标要跟着待处理条数变。
     @ObservedObject private var todoBoard = TodoBoard.shared
     // ★ 2026-10-30：版本彩蛋/开发者模式/诊断导出的状态已随「关于」区
     // 整体搬进 AboutNomilyView。
@@ -273,24 +272,10 @@ struct SettingsView: View {
         }
     }
 
-    /// ★ 2026-11-03（用户："设置的最上角增加一个横条，点击跳转亚马逊的购买页面，
-    /// 就是引导用户去购买 Vobot V05E"）：Amazon 商品页（含渠道追踪参数，原样保留）。
-    /// ⚠️ 用 `openURL` 交给**系统浏览器**，不进应用内 WebView——购买页有登录/购物车，
-    ///    内嵌视图既做不了也过不了 App Store 审核对"引导外部购买"的观感要求。
     private static let amazonStoreURL = URL(string:
         "https://www.amazon.com/dp/B0HHGWYS6J?maas=maas_adg_7561A19815A1FBF370F5F7E1AAD78D3E_afap_abs&ref_=aa_maas&tag=maas"
     )
 
-    /// One settings row: a Settings-app style colored tile, the title, and an
-    /// optional right-hand detail (current value) or count (badge).
-    ///
-    /// 2026-10-22 (\"按照苹果的简约风格来\"): the rows used to be bare
-    /// `NavigationLink(title)`s, so ten items of six different kinds read as one
-    /// undifferentiated list — icons were added for scannability.
-    /// 2026-11-02 上午（用户：\"要更加高级简约\"）：彩色瓦片撤成单色小符号。
-    /// ★ 2026-11-02 下午（用户：\"当前图标都是灰标不好看，按照苹果的风格设置图标来\"）：
-    ///   灰标被否——恢复成 iOS 设置 App 的排法：29pt 圆角彩色磁贴 + 白色 glyph，
-    ///   每行一个语义色（.gray/.blue/…），实色不加渐变（贴系统观感）。
     @ViewBuilder
     private func settingsRow<D: View>(
         _ title: String,
@@ -337,12 +322,6 @@ struct SettingsView: View {
                 searchField
             }
 
-            // ★ 2026-11-03（用户："设置的最上角增加一个横条，点击跳转亚马逊的购买页面，
-            // 就是引导用户去购买 Vobot V05E"）：设置页**最顶部**的购买横幅。
-            //
-            // 视觉：暖色底的一整条（区别于下面按行配色的磁贴——它是"店铺招牌"，
-            // 不是第 N 个设置项），跳转箭头用 ↗（外部链接的通用形状，不用 ›，
-            // 避免被读成"还有一层设置页"）。
             Section {
                 Button {
                     if let url = Self.amazonStoreURL {
@@ -383,9 +362,6 @@ struct SettingsView: View {
                 .accessibilityHint(L10n.Settings.buyBannerSubtitle)
             }
 
-            // ★ 2026-10-30（用户："设置下面最顶部加入一个，关于 Nomily"）：
-            // 「关于 Nomily」提到设置页第一行——图标 + 版本 + 官方账号 + GitHub +
-            // 用户协议/隐私政策，参考 Plaud 的关于页。
             Section {
                 settingsRow(L10n.About.title, icon: "info.circle", tint: .gray) {
                     AboutNomilyView()
@@ -410,9 +386,6 @@ struct SettingsView: View {
                 settingsRow(L10n.Settings.asrProviders, icon: "text.bubble", tint: .blue) {
                     ASRProvidersView()
                 }
-                // ★ 2026-11-06（用户："我在哪里能看到这个设置：后台保护指南，就是我没找到"）：
-                // 原来埋在 ASR 设置页深处的保活开关下面，等于没有入口。提到设置顶层——
-                // 它是"整台 App 能不能后台干活"的事，跟转写服务商不是一个层级。
                 settingsRow(L10n.ASR.bgpRow, icon: "shield.lefthalf.filled", tint: .green) {
                     BackgroundProtectionGuideView()
                 }
@@ -427,7 +400,6 @@ struct SettingsView: View {
                 settingsRow(L10n.Settings.summarizeTemplates, icon: "doc.text", tint: .orange) {
                     SummarizeTemplatesView()
                 }
-                // ★ 2026-10-28（饭耳逆向规格 §1.4）：常用词表——AI 整理的专名提示。
                 settingsRow(L10n.Vocabulary.title, icon: "character.book.closed", tint: .teal) {
                     VocabularyEditorView()
                 }
@@ -441,21 +413,9 @@ struct SettingsView: View {
                 settingsRow(L10n.Settings.devicesAndLibrary, icon: "externaldrive", tint: .green) {
                     DevicesLibraryView()
                 }
-                // ★ 2026-11-02（用户："应该是数据与存储位置"）：存储落点总枢纽
-                // 提到设置主页——本机 / iCloud 云盘 / NAS / 文件夹 App 一页看清。
                 settingsRow(L10n.StorageLocations.title, icon: "internaldrive", tint: .mint) {
                     StorageLocationsView()
                 }
-                // ★ 2026-10-29（用户："webdav 备份跟导出到文件夹还有相关都放到顶部的
-                // 录音跟传输里面"）：两个备份入口搬进了 录音与转写 页。
-                // ⛔ PLAUD lives on Recordings → Device, not here (2026-10-21): it is
-                // a device-scoped feature, not an app-wide setting. DingTalk A1 is
-                // likewise **not** here (2026-10-18): its credential belongs only on
-                // that card's own device-info page, because from Settings a
-                // card-shaped secret reads as account-level and people paste the
-                // wrong card's key.
-                // ★ 2026-11-06（饭耳 1.0 移植 P0-1）：待办看板。角标显示"等你决定"
-                // 的条数——这是用户唯一需要**动作**的数字，已结束的不算。
                 settingsRow(L10n.Todo.settingsRow, icon: "checklist", tint: .orange,
                             count: todoBoard.inboxCount > 0 ? todoBoard.inboxCount : nil) {
                     TodoBoardView()
@@ -473,13 +433,6 @@ struct SettingsView: View {
             }
 
             Section {
-                // ★ 2026-11-02：「使用引导」行——重置流程式引导进度（卡片重新从
-                // 第 1 步开始，RootView 的 overlay 负责展示）。
-                // ★ 2026-11-02（用户："开屏的欢迎页我如何才能再次体验"）：这一行同时
-                // 重播**开屏欢迎页**——直接在本页弹一次（不依赖 RootView 的首次绑定，
-                // 用户点完当场就能看到），并把「已看过」位落掉，避免下次启动再弹一次。
-                // ★ 2026-11-06：抽成 `usageGuideRow`——搜索命中「引导」时同一行要
-                // 能出现在结果里，两处必须是同一段视图，不能各写一份。
                 usageGuideRow
                 settingsRow(L10n.Settings.language, icon: "globe", tint: .indigo,
                             detail: currentLanguageLabel) {
@@ -493,16 +446,9 @@ struct SettingsView: View {
                 Text(L10n.Settings.groupGeneral)
             }
 
-            // ★ 2026-10-30（用户："ai 怎么称呼跟定时录音相关功能需要放入在
-            // APPLE WATCH 的设置里面不要放在目录下"）：称呼与定时录音已整体
-            // 搬进 Apple Watch 设置页（WatchFacePickerView，点手表行进入），
-            // 主目录只留手表行本身。
             watchSection
                 .id("watch-\(localization.effective)")
 
-            // ★ 2026-10-30（用户："顶部一个关于，下面一个关于是否是重复了"）：
-            // 底部旧「关于」区（版本/诊断/社交图标）已整体搬进顶部 AboutNomilyView，
-            // 设置页不再出现第二个"关于"。
 
             } else {
                 searchResults
@@ -524,9 +470,6 @@ struct SettingsView: View {
         .navigationDestination(isPresented: $env.navigateToRecordingsSettings) {
             RecordingsSettingsView()
         }
-        // ★ 2026-11-02（用户："开屏的欢迎页我如何才能再次体验"）：「使用引导」行当场
-        // 重播开屏欢迎页。挂在这里而不是交给 RootView 的 `welcome.seen.v1` 绑定——
-        // 那一个只在首次为 false 时弹，重看时用户已经在二级页面里了，还得先返回。
         .fullScreenCover(isPresented: $showWelcome) {
             WelcomeSheet(start: { showWelcome = false })
         }
@@ -536,35 +479,6 @@ struct SettingsView: View {
     /// ★ 2026-10-30：称呼与定时录音两个分区已整体搬进 WatchFacePickerView
     /// （Apple Watch 设置页），相关的草稿态/时间工具一并随迁。
 
-    /// The watch app ships inside this one, so there's nothing to download —
-    /// but that's exactly why it needs explaining. iOS installs it on its own
-    /// only when "Automatic App Install" is on, and otherwise leaves it sitting
-    /// in the Watch app's Available Apps list with no notification.
-    ///
-    /// ★ 2026-10-16 revision thirteen: this section gained a **Home Face** row (at the time an independent row +
-    /// independent Section).
-    ///
-    /// ★★ 2026-10-16 revision fifteen: those two rows were **merged into one** (user's words: "add the watch
-    ///   home-screen expression to the Nomily AI app's watch settings; tapping Apple Watch there is the menu bar,
-    ///   and when it is installed a tap goes into the expression settings -- merge it rather than giving the watch its own expression menu bar;
-    ///   and when it is not installed, a tap jumps to the phone's Watch app").
-    ///
-    /// So this row now branches on **whether the watch App is installed**:
-    ///   · **Installed** — a `NavigationLink` into the expression picker, with the current option's name on the right;
-    ///   · **Not installed** (including a watch that isn't paired) — becomes a button that **jumps to the
-    ///     "Watch" App on the iPhone**, to install it there (the right side keeps the original status text, plus an "opens elsewhere" badge).
-    ///
-    /// ⚠️ Why merging is right: install state and expression setting are two things about the **same object** to begin with,
-    ///    and once split into two rows the user sees no way out on the "not installed" row — that row can only be looked at,
-    ///    not tapped, while "what to do" is buried in a long footer. After the merge, "what happens when
-    ///    you tap this row" and "its current state" land in the same place.
-    ///
-    /// ⚠️ The check uses `isWatchAppInstalled` **and** `isActivated`: before activation completes that
-    ///    flag is necessarily `false` (see the top of `WatchSyncService`), and looking at it alone would misjudge
-    ///    the first few seconds after launch as "not installed", so a single tap throws the user over to the Watch App.
-    /// ★ 2026-10-30 二稿（用户："ai 怎么称呼跟定时录音……放入在 APPLE WATCH 的
-    /// 设置里面不要放在目录下"）：分区只留手表行——称呼与定时录音已搬进
-    /// Apple Watch 设置页（WatchFacePickerView）。
     @ViewBuilder
     private var watchSection: some View {
         Section {
@@ -683,8 +597,6 @@ struct SettingsView: View {
             : L10n.Watch.hintNotInstalled
     }
 
-    // ★ 2026-10-30：旧「关于」区已整体搬进 AboutNomilyView（用户："顶部一个
-    // 关于，下面一个关于重复了"），设置页底部不再重复。
 
     /// What the Language row shows on the right — the **effective** language,
     /// not the raw stored tag (see `LanguagePickerView.effective`).
@@ -751,7 +663,6 @@ struct ASRProvidersView: View {
             localSection
             customSection
             remoteLiveSection
-            // ★ 2026-10-29 (饭耳移植 · 规格 #10): one privacy sentence per page.
             Section {
                 PrivacyNote(flavor: .cloud)
             }
@@ -998,10 +909,6 @@ struct ASRProvidersView: View {
                     InfoTip(text: L10n.ASR.backgroundKeepAliveFooter)
                 }
             }
-            // ★ 2026-11-06（用户："加入后台常驻防止被杀…不行则增加用户引导"）：
-            // iOS 没有真正的"常驻"API，静音音频保活已经到顶；剩下的被杀风险
-            // 主要来自**低电量模式**（系统会掐后台音频）和用户上滑杀 App。
-            // 这里做引导：低电量开着就当场亮黄牌，别等任务断了才追悔。
             if ProcessInfo.processInfo.isLowPowerModeEnabled {
                 Label {
                     Text(L10n.ASR.lowPowerWarning)
@@ -1013,10 +920,6 @@ struct ASRProvidersView: View {
             }
             // ★ 入口已提到设置顶层（见 SettingsView 顶部分组）；这里不再重复放导航行。
 
-            // ★ 2026-10-29 (饭耳移植): night-shift backlog transcription. Complements
-            // keep-alive: that one holds the process *right now*; this one asks iOS
-            // for a window later tonight (charging + network) to drain the backlog
-            // of clips that never got a transcript.
             Toggle(isOn: Binding(
                 get: { configService.config.nightlyTranscribeEnabled },
                 set: { configService.config.nightlyTranscribeEnabled = $0; configService.scheduleSave() }
@@ -1109,7 +1012,6 @@ struct ASRProvidersView: View {
             // computer that will run the server; the AI does the install and prints the
             // host/port to type above.
             SetupAssistantRow()
-            // ★ 2026-10-28（饭耳逆向规格 §1.3）：粘贴 AI 输出的 NOMILY-SETUP 块自动回填。
             SetupAssistantPasteRow(target: .asr)
         } header: {
             Text(L10n.ASR.localASRServer)
@@ -1333,9 +1235,6 @@ struct ASRProvidersView: View {
 
     private var customSection: some View {
         Section {
-            // ★ 2026-11-04（用户："要的就是这个百炼的兼容"）：同一个"自定义服务"下
-            // 有两种接口形态，选错了只会看到 HTTP 404——因为百炼根本没有
-            // /audio/transcriptions，它把识别放在 chat/completions 里。
             Picker(L10n.ASR.customShape, selection: Binding(
                 get: { configService.config.asrProviders.custom?.wireProtocol ?? "whisper" },
                 set: { newValue in
@@ -1385,10 +1284,6 @@ struct ASRProvidersView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             customModelRow
-            // ★ 2026-10-30（用户："转录的内容还有很多不准确的，掺了多种语言"）：
-            // 原来自由文本语言提示几乎没人填 → 服务端自动检测在噪声/静音上跑飞
-            // （Whisper 系的典型症状：往韩语/威尔士语上幻觉）。改成明确的
-            // Picker——常用场景就是"我知道我在说什么语言"，固定下来即可根治。
             Picker(L10n.ASR.customLanguage, selection: Binding(
                 get: { configService.config.asrProviders.custom?.language ?? "" },
                 set: {
@@ -1636,8 +1531,6 @@ struct LLMProvidersView: View {
 
     var body: some View {
         Form {
-            // ★ 2026-10-29（用户："AI 用量统计放到大语言模型服务里面去"）：
-            // 每天用量热力图住在这里（截图 4 顶部），不再是设置页的独立入口。
             Section {
                 TokenUsageContent()
             } header: {
@@ -1650,13 +1543,6 @@ struct LLMProvidersView: View {
                 currentModelCard
             }
 
-            // ★ 2026-11-06（饭耳 1.0 移植 P1-4）：推理力度档。
-            //
-            // 饭耳把力度芯片放在问答输入条上（按次切）；这里做成**全局默认**，
-            // 因为 Nomily 的摘要/大纲/问答是同一条 LLM 链路，用户对"快还是深"
-            // 的偏好稳定，按页面各设一份只会让人忘记上次在哪改的。
-            // 之所以是独立一屏而不是藏在某个供应商 sheet 里：它决定的是**所有**
-            // 供应商的请求，挂在某一家下面等于说谎。
             Section {
                 Picker(L10n.LLM.effortTitle, selection: effortBinding) {
                     ForEach(LLMEffort.allCases) { effort in
@@ -1694,7 +1580,6 @@ struct LLMProvidersView: View {
                 Text(L10n.LLM.keychainFooter)
             }
 
-            // ★ 2026-10-29 (饭耳移植 · 规格 #10): one privacy sentence per page.
             Section {
                 PrivacyNote(flavor: .cloud)
             }
@@ -1708,7 +1593,6 @@ struct LLMProvidersView: View {
         .onDisappear { configService.saveNow() }
     }
 
-    // MARK: 推理力度（★ 2026-11-06 · 饭耳 1.0 移植 P1-4）
 
     /// 当前档位（未知/空 → auto，与请求侧回落规则一致）。
     private var currentEffort: LLMEffort {
@@ -1999,9 +1883,6 @@ private struct ProviderMark: View {
     }
 
     var body: some View {
-        // ★ 2026-11-02（用户："模型图标要按照当前 Apple Store 的 app 图标来，
-        // 不要简约的"）：有官方 App 的厂商直接渲染 App Store 彩色图标
-        // （自带底色，圆角随系统连续曲率）；没有的保留单色品牌瓦片。
         if let asset = spec.brandAsset, spec.usesAppStoreIcon {
             Image(asset)
                 .resizable()
@@ -2043,14 +1924,6 @@ private struct ProviderMark: View {
     }
 }
 
-/// ★ 2026-10-29（用户："小红书的图标按照小红书官方图标，其他的 X 跟 discord
-/// 也是一样"）：社交外链行的官方品牌图标。跟 ProviderMark 同一套小圆角瓦片
-/// 语言——X / Discord 用官方 logo 矢量资产（白色单色，瓦片给底色），小红书官方
-/// 图标本身就是「红底 + 白色『小红书』三个字」，直接用文字排版复刻。X 的瓦片
-/// 跟随明暗模式反色（浅色黑底白标 / 深色白底黑标），否则黑瓦片在深色分组
-/// 背景里会隐身。
-/// ★ 2026-10-30：从 private 改为 internal——「关于 Nomily」页（AboutNomilyView）
-/// 也要用这组品牌瓦片。
 struct SocialMark: View {
     // ★ 2026-10-30：加 .github ——「关于 Nomily」页的开源主页入口。
     enum Brand { case x, xiaohongshu, discord, email, github }
@@ -2197,10 +2070,6 @@ private struct ProviderConfigSheet: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .font(.body.monospaced())
-                        // ★ 2026-10-29（截图 1「还没有 key？去注册 ↗」）：注册页直链。
-                        // ★ 2026-11-02（用户："方便用户如何获取 apikey 填写"）：改为
-                        // **常驻**——没 key 时是"去注册获取"，已有 key 时是"前往控制台
-                        // 管理"（续费/换 Key/看用量都在那个页面），不再一填完就消失。
                         if let url = URL(string: spec.signupURL ?? "") {
                             Link(destination: url) {
                                 HStack {
@@ -2214,9 +2083,6 @@ private struct ProviderConfigSheet: View {
                                 }
                             }
                         }
-                        // ★ 2026-11-02（用户："不会获取 APIkey……新增一个不会开通？
-                        // 复制提示词跟粘贴结果，参考饭耳的这个快引导"）：注册直链
-                        // 下面挂快引导——复制提示词问 AI，粘贴回复自动填 Key。
                         Button {
                             showKeyWizard = true
                         } label: {
@@ -2251,10 +2117,6 @@ private struct ProviderConfigSheet: View {
                         }
                     }
 
-                    // ★ 2026-11-04（用户："当前自定义的需要支持这种不只是 openai 的"）：
-                    // 自定义渠道原来只有一个隐含假设——对端说 OpenAI 的
-                    // `/chat/completions`。但百炼这类"业务空间专属端点"同时给出
-                    // OpenAI 兼容与 Anthropic 兼容两个 Base URL，用户贴哪个就得能用哪个。
                     if spec.id == "custom" {
                         Picker(L10n.LLM.protocolTitle, selection: protocolBinding) {
                             ForEach(LLMWireProtocol.allCases) { proto in
@@ -2331,10 +2193,6 @@ private struct ProviderConfigSheet: View {
                             }
                         }
                     }
-                    // ★ 2026-11-04（用户："获取不了模型"）：这里原本是
-                    // `.disabled(key.isEmpty)`——按钮直接变灰，点下去既没有反应也没有
-                    // 任何文案，读起来就是"坏了"。改成永远可点，缺前置条件时把原因
-                    // 写在原来的报错位上，用户至少知道自己该补什么。
                     .disabled(verify == .verifying)
 
                     if !options.isEmpty, !manualModel {
@@ -2349,8 +2207,6 @@ private struct ProviderConfigSheet: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 6) {
                         if let note = spec.localizedNote { Text(note) }
-                        // ★ 2026-11-05（用户："介绍里设置一个花费情况"）：这家厂商
-                        // 摘要一小时录音的大概花费（¥/$ 跟随界面语言）。
                         if let cost = spec.localizedCost {
                             HStack(alignment: .top, spacing: 4) {
                                 Image(systemName: "yensign.circle")
@@ -2774,8 +2630,6 @@ struct RecordingsSettingsView: View {
     /// ★ 2026-10-29：提醒事项权限被拒时提示去系统设置。
     @State private var remindersDenied = false
 
-    /// ★ 2026-10-29（用户："待办支持同步到 iPhone 里面的待办，需要打开这个开关"）：
-    /// 开关打开时请求提醒事项授权；被拒就回拨开关并给「去设置」入口。
     private var remindersSyncSection: some View {
         Section {
             Toggle(isOn: Binding(
@@ -2835,13 +2689,7 @@ struct RecordingsSettingsView: View {
                     }
                 }
             }
-            // ★ 2026-11-02（用户："数据储存位置跟录音与传输好像也重复了"）：
-            // 「数据与存储位置」总枢纽只在设置主页出现（另有入口行），这里
-            // 不再重复；备份选择引导页脚随枢纽一起撤掉。手表录音质量分区
-            // 也已整体搬进 Apple Watch 设置页（它只对手表生效）。
 
-            // ★ 2026-10-29（用户："待办支持同步到 iPhone 里面的待办，需要打开
-            // 这个开关"）：打开后录音摘要里的待办行写进系统「提醒事项」。
             remindersSyncSection
 
             passphraseSection
@@ -2891,7 +2739,6 @@ struct RecordingsSettingsView: View {
                 }
             }
 
-            // ★ 2026-10-29 (饭耳移植 · 规格 #10): one privacy sentence per page.
             Section {
                 PrivacyNote(flavor: .storage)
             }
@@ -2982,10 +2829,6 @@ struct RecordingsSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            // ★ 2026-11-04（用户："在 Nomily 链接的时候增加检查密钥当前是否符合"）：
-            //   这一行回答的是"我这把钥匙到底能不能开设备上的录音"。
-            //   它和上面的"本地密钥 已配置"不是一回事——已配置也可能配错，
-            //   尤其是设备被官方 App 设过钥匙的时候。
             keyCheckRow
             // When the device is already encrypted, this flow performs **verification**: record a probe, attempt decryption with the entered passphrase,
 // and only if it succeeds write it to the Keychain (see `PassphraseSheet.primaryActionLabel`). Naming the entry “Set Passphrase” would mislead users into thinking they are creating a new one, while the device does not store or retrieve the passphrase.
@@ -3398,11 +3241,6 @@ struct DevicesLibraryView: View {
                             .tint(.primary)
                         }
                     } else {
-                        // ★ 2026-10-27（用户："点设备列表里的安克录音豆没切换，
-                        // 一直显示 PLAUD NOTE PRO"）：非 PLAUD 行以前只是纯展示
-                        // VStack，点了没有任何动作。现在整行可点 → 断开当前连接
-                        // 并重连所选记录（与 RootView.connectRecorderDevice 同一
-                        // 流程）；录音豆按 mergeKey 兜底匹配（见 reconnectRecorder）。
                         Button {
                             switchToKnownDevice(row)
                         } label: {
@@ -3869,15 +3707,6 @@ struct PassphraseEntrySheet: View {
         // 设备是否已被我们解除过——失败回滚时要把加密重新打开（见 catch）。
         var deviceWasReleased = false
         do {
-            // ★ 2026-11-09（用户："轮换密钥覆盖都无法正常覆盖了…录音能传输但解密失败"）：
-            //   固件 0xA2 的硬规则（官方协议 PDF §0xa2）——
-            //   「已有密钥且开启状态下，必须**先解除**才能设新密钥；解除必须
-            //   **带对旧密钥**，固件比对不一致不予解除」。
-            //
-            //   所以解除这一步**必须拿旧钥匙**去做。旧实现用的是刚派生出来的新钥匙
-            //   （`key`），那等于要求"新旧口令一模一样"——只要用户真想换个口令，
-            //   固件必然拒绝，于是"轮换"永久失效。修复：先拿本机 Keychain 里那把
-            //   已知能开的旧钥匙（`previous`）去解，解开再写新钥匙。
             if try await client.getEncryptionState() {
                 var released = false
                 // ① 本机保存的旧钥匙：正常路径（钥匙就是在这台手机上设的）
@@ -3964,8 +3793,6 @@ struct BackgroundProtectionGuideView: View {
                 keeperRow
             }
 
-            // ★ 2026-11-06（用户："后台保护指南里面也要把相关权限都加入进去，
-            // 例如手表链接，状态，蓝牙之类的我没想到的"）：设备链路 + 权限三行。
             Section {
                 bluetoothRow
                 micRow

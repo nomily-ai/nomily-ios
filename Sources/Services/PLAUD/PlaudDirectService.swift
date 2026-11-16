@@ -671,12 +671,8 @@ final class PlaudDirectService: NSObject, ObservableObject {
                     return engine
                 }
             case "custom":
-                // ★ 2026-11-04（用户："实时转录为啥不是我设置的自定义服务器"）：
-                // 自定义端点（OpenAI 兼容 / 百炼）没有 WS 双向流，只有
-                // `chat/completions` + `input_audio` 整段音频，所以这里走
-                // **5 s 切片准实时**（`PlaudBailianLiveTranscriber`）。原来
-                // custom 落在 default 的 `continue` 里，链条直接走到 Azure，
-                // 用户配的服务器形同不存在。
+                // Custom endpoints process short audio slices when they do not
+                // provide a bidirectional streaming interface.
                 if let custom = cfg?.asrProviders.custom,
                    !custom.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     log.info("plaud live asr engine=custom chunked lang=\(localeID, privacy: .public)")
@@ -858,12 +854,7 @@ final class PlaudDirectService: NSObject, ObservableObject {
     /// 2 s after the stop, so it does not race the file-list refresh or the last
     /// audio packets. `bleMarking` takes it from there.
     ///
-    /// This is the experiment the RE doc (`Plaud-卡片按键打点-逆向与实现方向.md`)
-    /// asks for, done from the safe side: no raw frames (the Plaud link is
-    /// ChaCha20-encrypted inside `BleAgent`, so we cannot write `02 26 …` by
-    /// hand) — `getRecordMarkingTags` **is** that `0x26` request, already built
-    /// by the SDK, so calling it is the same wire traffic without touching the
-    /// transport.
+    /// Use the SDK request rather than constructing encrypted transport frames.
     private func probeMarksAfterTake(sid: Int?) {
         guard let sid, sid > 0 else {
             TicNoteDiagLog.log("PLAUD-REC", "post-take getMarking skipped (no session id)")
@@ -2983,7 +2974,7 @@ extension PlaudDirectService: PlaudDeviceAgentProtocol {
         switchWatchdog = nil
         setSwitchNote(nil)
         TicNoteDiagLog.log("PLAUD", "bound \(sn)")
-        // 任务八 · 8.1: the link is up, so "when did I last have it" is now.
+        // Capture the advertised name while the connection is active.
         // The advertised name is what the proximity scan has to match, and it
         // only exists in the scan cache — capture it while it is still there.
         let advName = cachedBleDevices[sn]?.name
@@ -3924,9 +3915,7 @@ extension PlaudDirectService: PlaudDeviceAgentProtocol {
         DispatchQueue.main.async { self.cardFileCount = nil }
         let wasConnected = phase.isConnected
         if case .connected = phase { setPhase(.idle) }
-        // 任务八 · 8.1: an unrequested drop is exactly the moment worth
-        // remembering — "when/where did I last have it" plus, if the user
-        // asked for it, a local alert.
+        // Record an unexpected drop for the local last-seen state and optional alert.
         guard wasConnected else { return }
         let name = pairedSN.map { Self.storedName(for: $0) }
         Task { @MainActor in

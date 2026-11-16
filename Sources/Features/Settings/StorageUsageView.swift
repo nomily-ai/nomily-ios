@@ -1,20 +1,5 @@
 import SwiftUI
 
-/// ★ 2026-10-30（用户："录音文件大小在本地占用多少，nas 占用多少，iCloud 占用多少
-/// 大小需要显示出来"）
-///
-/// 三处占用一页看完：本地（实测 `audio_clips/`）、WebDAV NAS（PROPFIND 实测服务器
-/// 字节数）、iCloud/文件夹（书签进目录实测）。进页面自动刷，下拉也能刷。
-///
-/// ★★ 2026-10-30 二稿（用户："储存占用直接按照块状显示，设备与资料库，显示统计
-/// 那个设备记录时长还有手表的，按照储存统计方式，不要单纯的文字显示，多一点图表
-/// 动效"）：整页从「三行文字」改成**块状卡片 + 图表**：
-///   ① 顶部总览块：总占用大字 + 三段堆叠条（本机 / NAS / iCloud 各占多少，条长
-///      随数据 animated 长出来）；
-///   ② 「设备与资料库」块阵：来源（录音豆按设备别名分区 / Apple Watch / 导入）
-///      各一张卡，卡里是字节数 + **录音时长** + 条数 + 占比细条；
-///   ③ 「存储位置」块阵：三个位置各一张卡，带占比条；
-///   ④ 底部脚注保留"实测口径"的说明——数字要能被解释，不能只是好看。
 struct StorageUsageView: View {
     @EnvironmentObject private var configService: ConfigService
     @ObservedObject private var usage = StorageUsageService.shared

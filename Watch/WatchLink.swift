@@ -14,12 +14,6 @@ final class WatchLink: NSObject, ObservableObject {
     /// confirm it wrote them. Until a clip clears both, the wrist copy is the
     /// only one that definitely exists.
     @Published private(set) var deliveredNames: Set<String> = []
-    /// ★ 2026-10-30（用户："录音断联需要状态弹出提醒告知"）：手机当前是否可达。
-    ///
-    /// ⚠️ 语义提醒：`isReachable` 要求**对端 App 在前台**——手机 App 退到后台
-    /// 后这里就会变 false，哪怕蓝牙还连着、transferFile 照样能送达。所以这个
-    /// 值只用于「提醒用户」场景（见 `WatchRecorderModel.handleReachability`），
-    /// 不参与任何传输判断——传输走的是后台队列，从来不依赖可达性。
     @Published private(set) var phoneReachable = false
     /// 可达性变化回调（true = 手机回到前台/重新可达）。
     var onReachabilityChanged: ((Bool) -> Void)?

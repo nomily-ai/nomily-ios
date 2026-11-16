@@ -1,18 +1,5 @@
 import Foundation
 
-/// Wire protocol a *custom* endpoint speaks.
-///
-/// ★ 2026-11-04（用户："当前自定义的需要支持这种不只是 openai 的"）：
-/// 自定义渠道原先只有一个假设——`{base}/chat/completions` 就是 OpenAI 的补全接口。
-/// 但用户手里的 key 往往来自一个"业务空间专属端点"（阿里云百炼的
-/// `https://ws-….maas.aliyuncs.com/compatible-mode/v1`），控制台同时给出
-/// OpenAI 兼容与 Anthropic 兼容两个 Base URL；只认 OpenAI 的那一套会在两种情况下悄悄失效：
-/// 1. base 自己已经带了版本段（`/compatible-mode/v1`、`/api/v3`），再拼 `/v1` 就成
-///    `/v1/v1/models`——模型列表永远 404，用户看到的是"这个渠道不能用"；
-/// 2. 端点只提供 Anthropic Messages 格式，OpenAI 的 `/chat/completions` 根本不存在。
-///
-/// So the sheet asks which protocol it is, and the URLs are built by `LLMEndpoint`
-/// instead of string-concatenated at each call site.
 enum LLMWireProtocol: String, CaseIterable, Identifiable {
     case openai
     case anthropic

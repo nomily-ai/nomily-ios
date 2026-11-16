@@ -4,27 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "asr.bailian")
 
-/// 阿里云百炼（Model Studio）的 `qwen3-asr-flash`，走它的 **OpenAI 兼容端点**。
-///
-/// ★ 2026-11-04（用户："要的就是这个百炼的兼容当前这个语音识别服务的问题"）：
-/// 百炼并不提供 OpenAI 的 `/audio/transcriptions`——那个路径在专属端点和主站都是 404
-/// （实测 qwen3-asr-flash / fun-asr / whisper-1 全部如此）。它的兼容模式把语音识别
-/// 放在 **chat/completions** 里，用 `input_audio` 传音频：
-///
-/// ```json
-/// { "model": "qwen3-asr-flash",
-///   "messages": [{"role":"user","content":[{"type":"input_audio",
-///                 "input_audio":{"data":"data:audio/mpeg;base64,…"}}]}],
-///   "stream": false, "asr_options": {"enable_itn": true} }
-/// ```
-///
-/// 三条硬限制决定了这个文件里的切片逻辑：
-/// * 单次音频 ≤ **10 MB**；
-/// * 单次时长 ≤ **5 分钟**；
-/// * 只传 base64，没有 multipart 上传通道。
-///
-/// 所以超过 4.5 分钟（留余量）的录音要先用 AVFoundation 按时间切段，逐段识别再拼回去——
-/// 片段时间戳会按原始时间轴回填，剪辑片段上的跳转才不会错位。
 struct BailianASR {
 
     var endpoint: String

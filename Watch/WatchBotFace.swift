@@ -262,15 +262,8 @@ struct WatchBotFace: View {
     ///   波形重绘 30fps → 2fps。只在录音中起作用（波形也只在录音中存在）。
     var lowPower: Bool = false
 
-    /// ★ 2026-11-06（用户："手表这边可以增加一个表情常亮让手表持续显示在首页"）：
-    /// 常亮暗态（wrist down，`dimmed == true`）下首页**显示表情**还是黑屏省电。
-    /// true（默认）= 维持现有行为：表情停在静息位、动画全停（见文件顶部的常亮段落）；
-    /// false = 暗显时整块内容淡到不可见，给 AMOLED 省电。
-    /// ⚠️ 它**不能**改变"多久返回表盘"——那是系统设置（唤醒屏幕 → 返回表盘时间）。
     var alwaysOnFace: Bool = true
 
-    // MARK: ★ 2026-11-06 二轮（用户："瞳孔跟随手指…不操作打瞌睡…眼睛形状也加入"）
-    // —— "让脸活起来"这一组的四个输入，全部从 `WatchRecordingPrefs` 透传。
 
     /// 眼睛形状轴（`BotEyeShape`），与表情轴正交。
     var eyeShape: BotEyeShape = .tall
@@ -305,9 +298,6 @@ struct WatchBotFace: View {
     ///    so capturing `self` inherits the main actor and, as a bonus, can be cancelled proactively.
     @State private var idleLoop: Task<Void, Never>?
     @State private var gazeLoop: Task<Void, Never>?
-    // MARK: ★ 2026-11-06 二轮（用户："不操作交互打瞌睡…主要要让他活起来"）
-    /// 困倦档位：0 清醒 / 1 打盹（眼皮半合 + 慢呼吸）/ 2 睡着（闭眼，只剩呼吸）。
-    /// 借鉴 agent-avatars 的 `drowsy → asleep` 阶梯（idle 无操作 → drowsy → 8s → asleep）。
     @State private var drowsyLevel = 0
     /// 检查"多久没摸了"的循环。挂在 `startIdleMotion` 的同一套开关上。
     @State private var sleepLoop: Task<Void, Never>?
@@ -343,16 +333,6 @@ struct WatchBotFace: View {
     /// The handle for the dizzy `Task`. Shaking twice in a row must cancel the previous one first, for the same reason as `moodTask`.
     @State private var dizzyTask: Task<Void, Never>?
 
-    // MARK: 「眨眼」式形变（★ 2026-11-02，用户："手表这个录音动画可以采用眨眼方式过渡"）
-    //
-    // 原型（nomily-watch-v3-blink.html）的过场不是一个淡入淡出，而是一次**眨眼**：
-    //   开始：双眼压扁成一条线（scaleY → .02、scaleX → 1.38）→ 线从中心向两侧长出来
-    //        → 振幅起振、开始呼吸；
-    //   停止：振幅收掉 → 线从两端收回中心 → **第二次眨眼**，双眼带过冲弹回来。
-    //
-    // 所以 `figure` 里两个形态必须**同时存在**，只靠下面三个值交接。`if isRecording`
-    // 硬切做不出"压扁"这个过程——那一瞬间眼睛已经不在树里了。
-    /// 0 = 眼睛原样，1 = 压扁成一条线。
     @State private var eyesSquash: CGFloat = 0
     /// 眼睛透明度：压扁到后半段才归零，否则"压扁"看不见。
     @State private var eyesFade: CGFloat = 1
@@ -362,9 +342,6 @@ struct WatchBotFace: View {
     /// 停止录音时先把它压平（320ms），再收线——原型 opening 段两件事是叠着做的，
     /// 只收线不收幅就是用户描述的"半圆往内缩"。
     @State private var waveLevel: CGFloat = 1
-    /// ★ 2026-11-03 五轮（用户："结束还有一个白色光环往内靠，需要取消"）：
-    /// 波形整条的**淡出系数**。停止时的收场改成"压平成一条线 → 原地淡出"，
-    /// 不再用横向遮罩往中间收——那个横向收缩正是"光环往里收"的观感。
     @State private var waveFade: CGFloat = 1
     /// 过场的 `Task` 句柄。连点两次必须取消上一段，否则两段动画抢同一批 @State。
     @State private var morphTask: Task<Void, Never>?
@@ -568,11 +545,6 @@ struct WatchBotFace: View {
         }
         .onChange(of: pokeTick) { _, _ in pokeOnce() }
         .onChange(of: dizzyTick) { _, _ in playDizzy() }
-        // ★★ 2026-11-03 五轮（用户："长按要有一个白色的圈顺时针旋转闭合，当前没有按这个要求来"）：
-        //   旧的 `onChange(of: holding)` 整段删掉了。原因见 `holdGesture`——
-        //   `LongPressGesture.updating` 的 bool **只在按满 2 秒之后**才变真，
-        //   于是"环随进度走"从来没发生过：前 2 秒屏幕毫无反应，2 秒后环才从 0
-        //   开始画，而那时手指一松录音就开始了。现在按下即开始，进度由手势驱动。
         .onChange(of: isRecording) { _, _ in
             // ⚠️ Revision ten: both branches now call `startIdleMotion()`, no longer each writing their own.
             //    Because "what to do while recording" is no longer just "park the breathing flat" -- there are now two
@@ -585,8 +557,6 @@ struct WatchBotFace: View {
             // ⚠️ Before revision nine there was also a `sway` here (the two eyes drifting out of phase). The recording state
             //    is now swapped entirely for a waveform, the eyes are simply absent, and that state was deleted along with it.
             startIdleMotion()
-            // ★ 2026-11-02（用户："手表这个录音动画可以采用眨眼方式过渡"）：眼睛 ⇄ 波形 走
-            //   「压扁 → 长线 → 收线 → 弹回」的形变，不再是一帧硬切。
             morphToRecording(isRecording)
         }
         .onChange(of: dimmed) { _, _ in
@@ -654,7 +624,6 @@ struct WatchBotFace: View {
                     waveLevel = 1
                     waveFade = 1
                 }
-                // ① 眼睛闭下（用户："眼睛闭下，然后一条白色的线"）
                 withAnimation(.easeIn(duration: 0.15)) { eyesSquash = 1 }
                 try? await Task.sleep(nanoseconds: 140_000_000)
                 guard !Task.isCancelled else { return }
@@ -664,7 +633,6 @@ struct WatchBotFace: View {
                 // ② 一条白线从中心向两侧长成波形
                 withAnimation(.easeOut(duration: 0.53)) { waveReveal = 1 }
             } else {
-                // ① 波形压平成一条线（用户："音波变成一条线，眼睛睁开"）
                 withAnimation(.easeInOut(duration: 0.32)) { waveLevel = 0 }
                 try? await Task.sleep(nanoseconds: 340_000_000)
                 guard !Task.isCancelled else { return }
@@ -678,14 +646,6 @@ struct WatchBotFace: View {
                 tx.disablesAnimations = true
                 withTransaction(tx) {
                     waveReveal = 0
-                    // ★ 2026-11-03 八轮（用户："结束录音时还有一圈白光往内缩"）：
-                    //   这里补两件事——虽然这支环的**可见性**早就不看 `holdProgress` 了，
-                    //   但 `holdProgress` 还挂在眼睛的纵向缩放上
-                    //   （`scaleEffect(y: … * (1 - 0.70 * holdProgress))`）。
-                    //   用户若是"长按开录"起的那一段，`holdProgress` 会一直停在 1，
-                    //   结束时眼睛就是**压扁 70% 地睁开**——一个矮而宽的形状，
-                    //   在纯黑底上恰好读作"一圈白色的东西在往里收"。
-                    //   ⇒ 睁眼之前无条件归零，眼睛才是原来那个比例。
                     holdProgress = 0
                     sweepFading = false
                 }
@@ -1104,10 +1064,6 @@ struct WatchBotFace: View {
     ///    own size and shape (`eye(mirrored:)`), which is a different matter from the whole face's inflate-deflate,
     ///    and mixing it into this product would turn into "how big the expression is depends on where the breathing happened to be."
     private var figureScale: CGFloat {
-        // ★ 2026-11-03 九轮（用户："轻点一下眼睛的效果太夸张了，变大弄得超出屏幕边框"）：
-        //   呼吸 1.028 / 0.992 与轻点 1.03 的幅度在"眼睛已经放得很大"之后就是**顶框**：
-        //   1.14 的外框本来贴着屏幕边，再乘 1.03 就整个顶出圆角。
-        //   现在呼吸 ±0.9%、轻点 +1.2%，读起来仍是"它在呼吸/它被碰了一下"，但峰值留得住边。
         var s: CGFloat = (dimmed || isRecording) ? 1 : (breathe ? 1.009 : 0.994)
         s *= 1 + poke * 0.012
         return s
@@ -1221,9 +1177,6 @@ struct WatchBotFace: View {
     /// -- that would turn "where exactly is the wave" into something you have to compute.
     @ViewBuilder
     private var figure: some View {
-        // ★ 2026-11-02（用户："手表这个录音动画可以采用眨眼方式过渡"）：两个形态**同时在树里**，
-        //   交接全靠 `eyesSquash` / `eyesFade` / `waveReveal` 三个值——
-        //   "眼睛压扁成一条线"和"线撑开成波形"本来就是同一根线的两种形态（原型的「一条线」母题）。
         ZStack {
             eyes
                 // 压扁：纵向 1 → 0.02、横向同时撑到 1.38，读作"两条竖线塌成一根中线"
@@ -1296,12 +1249,6 @@ struct WatchBotFace: View {
             // ★ 2026-11-06 二轮：形状轴从手机设置一路推下来。
             shape: eyeShape
         )
-            // ★ Revision fourteen: the shake "dizzy." The whole pair of eyes spins twice around its own center.
-            //
-            // ★ 2026-11-03 八轮（用户："眼睛不够生动，参考 grok bot"）：
-            //   视线左右漂移时**整对眼睛跟着微微倾斜**（±2.4°），像"转头看"而不是
-            //   "两张贴纸在平移"。Grok bot 的活气很大程度上来自这种小幅姿态变化——
-            //   只有位移没有旋转，看久了就是幻灯片。
             .rotationEffect(
                 .degrees(dizzyAngle + Double(gaze.width / max(1, gazeAmpX)) * 2.4),
                 anchor: .center
@@ -1353,34 +1300,6 @@ struct WatchBotFace: View {
     /// ⚠️ 录音中的虚线环保持粗（那是"还剩多少圈可以跑"的表盘刻度，细了看不见）。
     private var holdRingIdleWidth: CGFloat { max(2, size * 0.015) }
 
-    /// ★★ 2026-10-23 (user: "启动跟关闭都是更暂停"): the same ring played for
-    /// both directions, so a press **to start** and a press **to stop** looked
-    /// identical — and "a ring with two bars inside" reads as a pause button,
-    /// which is what made both look like "paused". The arc now explains itself:
-    ///
-    /// * **idle** (this press will start a take) — a solid arc, the original look;
-    /// * **recording** (this press will end the take) — the *same* arc, drawn
-    ///   **dashed and thinner**, sitting outside the live wave.
-    ///
-    /// Solid = "fill this up to begin", dashed = "let this run out to end". No new
-    /// labels, no new screen, and the difference survives always-on dimming.
-    /// ★★ 2026-11-03 四轮重写（用户："首页边框竟然还有没有彻底消掉" +
-    ///    "看图会有一圈这个白色，长按后会画圈闭合就开始，需要优化" +
-    ///    "开始录音的时候外圈没有按照半圆弧的进度一样开始"）：
-    ///
-    /// 截图里那圈常驻的白线就是这支环——旧实现 `if holdProgress > 0.002`，
-    /// 而 `holdProgress` 在"长按成功/取消"之后经常**残留**在 1，
-    /// `sweepFading` 的淡出只在它翻真那一拍播一次，之后任何状态变化都不会再收掉它。
-    /// 结果：待机时挂着一条整圈白线（用户读成"边框"），长按时环已经是满的，
-    /// 看不出"弧随进度走满一圈"——两条反馈同一个根源。
-    ///
-    /// ## 原型的规矩（nomily-watch-v4-full.html `renderHold`）
-    /// 环**只在手指压着的时候存在**：按下 250ms 淡入，弧随 2s 进度走；
-    /// 走满或松手，立刻回全遮、归零。它从不比手指活得久——所以不可能卡屏。
-    ///
-    /// 这里照抄：可见性挂在 `pressDown`（按下的第一帧置真，抬指/划走/触发后必然归假）上，
-    /// `sweepFading` 只负责"长按成功后手指还没抬起来的那一小段"先把环收掉，
-    /// 好让位给眨眼过场。残留的 `holdProgress` 依然在下次按压时无动画归零（见 onChange）。
     @ViewBuilder
     private var holdLayer: some View {
         Circle()
@@ -1388,22 +1307,10 @@ struct WatchBotFace: View {
             .stroke(
                 tint,
                 style: StrokeStyle(
-                    // ★ 2026-11-03 五轮（用户："结束录音也有一个白色光环往内靠，需要取消"）：
-                    //   环**只属于开录**——录音中按住结束不再画那支粗虚线环（它的粗细
-                    //   在两态之间切换，真机上就是"又一圈白线在动"）。结束的反馈交给
-                    //   确认条与"波形平掉→睁眼"的收场动画。
-                    //   ⇒ 现在只剩一种画法：开录长按的 2pt 细环，顺时针走满即闭合。
                     lineWidth: holdRingIdleWidth,
                     lineCap: .round
                 )
             )
-            // ★★ 2026-11-04（用户："录音长按页面的圆圈还是不够大需要设置到最大"）：
-            //   外框过去扣的是 `holdRingWidth`（录音中那支**粗虚线环**的宽度，
-            //   ≈0.06×size ≈ 10pt）——但这条细环自己的宽度是 `holdRingIdleWidth`
-            //   （2pt）。拿粗环的宽度扣细环的框，等于凭空把环往里缩了 ~8pt：
-            //   45mm 上环径 186 → 177，"明明脸已经放大了、环还是小一圈"就是它。
-            //   现在扣环自己的线宽：描边外沿恰好贴着 1.14×size 的外框，
-            //   也就是 `recordPane` 里 `budget` 反推出来的"能画到的最大位置"。
             .frame(width: size * 1.14 - holdRingIdleWidth,
                    height: size * 1.14 - holdRingIdleWidth)
             .rotationEffect(.degrees(-90)) // start at 12 o'clock, like the old ring

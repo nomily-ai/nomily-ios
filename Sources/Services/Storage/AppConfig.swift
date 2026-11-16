@@ -49,27 +49,12 @@ struct AppConfig: Codable, Equatable {
     /// Turning it off leaves only `beginBackgroundTask`'s ~30-second grace — short jobs still finish,
     /// long ones get cut. There's a switch because the user should have the right to refuse "tricking the background with silent audio".
     var backgroundKeepAliveEnabled: Bool
-    /// ★ 2026-10-29 (饭耳移植): night-shift backlog transcription via BGProcessingTask.
-    /// When on, iOS may wake the app overnight (charging + network) to transcribe
-    /// recordings that never got a transcript. Off = never wake in the background.
     var nightlyTranscribeEnabled: Bool
-    /// ★ 2026-10-29 (饭耳移植 · 规格 §3.1): timed overnight recording. Between
-    /// `timedRecordingStart`/`timedRecordingEnd` ("HH:mm") the phone mic records
-    /// until the window ends. Off by default — auto-recording at night is a
-    /// decision the user must make explicitly.
     var timedRecordingEnabled: Bool
     var timedRecordingStart: String
     var timedRecordingEnd: String
-    /// ★ 2026-11-02（用户："需要设置什么时间段，例如一直录，跟设置一个时间段
-    /// 录制"）：`true` = 一直录——开关打开立即命令手表开录，不分时间段，
-    /// 关掉开关才停；`false` = 按 `timedRecordingStart`/`End` 的窗口录。
     var timedRecordingAlwaysOn: Bool
-    /// ★ 2026-10-29 (饭耳移植 · 规格 §2.3): WebDAV backup destination. `nil` =
-    /// not configured. The password travels through `SecretStore` (Keychain)
-    /// and is stripped before `config.json` is written — see ConfigService.
     var webdav: WebDAVConfig?
-    /// ★ 2026-10-29 (饭耳移植 · 规格 §2.2): the cold-data downgrade tier —
-    /// `RecordingQualityTier.rawValue`. `nil`/`asIs` = keep original quality (default).
     var recordingQualityTier: String?
     /// When on, clips older than `coldDataDowngradeDays` that already have a
     /// transcript get re-encoded down to `recordingQualityTier` in place.
@@ -140,43 +125,15 @@ struct AppConfig: Codable, Equatable {
     var watchFaceAutoCycle: Bool?
     /// Whether the rounded-square frame is drawn around the watch face. `nil` = `true`.
     var watchFaceFrame: Bool?
-    /// ★ 2026-10-28（饭耳逆向规格 §3.2）：用户称呼。AI 摘要/整理 prompt 里用
-    /// 它交代「录音的主人是谁」，转写说话人标注也能对上「X（我）」。
-    /// `nil`/空 = 用户没填，prompt 里不加这条（保持旧行为）。
     var userName: String?
-    /// ★ 2026-11-06（饭耳 1.0 移植 P1-4）：推理力度档 `auto|low|medium|high`。
-    ///
-    /// 存成字符串而不是枚举：`config.json` 是跨版本共享的，未知值必须能原样读进来
-    /// 再回落到 `.auto`（枚举解码遇到未知值会整份配置读失败——那是灾难）。
-    /// `nil`/空 = auto，与旧配置行为一致。
     var llmEffort: String?
-    /// ★ 2026-10-30（用户："回顾摘要要支持在手机设置里面支持设置"）：
-    /// 是否把「回顾摘要」推到手表（默认开）。关掉后手机不再推送，并把待发队列
-    /// 清空、推一次空列表，让手表也清掉旧摘要。
     var watchRecapEnabled: Bool
-    /// ★ 2026-10-29（用户："待办支持同步到 iPhone 里面的待办，需要打开这个开关"）：
-    /// 开启后录音摘要里的待办行会写进系统「提醒事项」App（EventKit Reminders），
-    /// App 内勾选/取消勾选也会同步提醒事项的完成状态。`false` = 不同步（默认）。
     var remindersSyncEnabled: Bool
     /// Backlog size (in KB) above which the Wi-Fi fast-transfer button
     /// is offered on the device-files screen. 0 disables the suggestion
     /// and the button never appears.
     var fastTransferThresholdKB: Int
-    /// ★ 2026-11-09（用户："选择 nas 或者其他都是用的同一个，没有区分每个品牌
-    /// 跟配置，都是点击出现的 NC 的配置"）：**全部**已保存的 WebDAV 目的地。
-    ///
-    /// 之前只有一个槽位（`webdav`），弹层里选哪个品牌都会把上一家覆盖掉，
-    /// 而且配置页读到的永远是那唯一一条——用户的原话就是"点谁都是 NC 的配置"。
-    /// 现在每家各占一条（`WebDAVConfig.id` 区分），「当前使用」的那条继续镜像
-    /// 进 `webdav`，所有旧读取方（同步/占用/后台上传）零改动。
-    /// `nil` = 尚未迁移（旧配置）；迁移在 `init(from:)` 里做一次。
     var webdavAccounts: [WebDAVConfig]?
-    /// ★ 2026-11-09（用户："是否是每条录音都传输吗…可能需要一个选择筛选"）：
-    /// 转写完成后**自动**往存储目的地（WebDAV / 文件夹）送哪些录音。
-    ///   · nil / "all"        —— 每条（现状，默认）；
-    ///   · "with_summary"    —— 等摘要生成后再送（摘要是最有价值的产物）；
-    ///   · "manual"          —— 从不自动，只走「立即同步」。
-    /// 手动「立即同步」永远全量，不受此档位影响。
     var autoUploadScope: String?
     /// 「当前使用」的账户 id（自动备份/手动同步走它）。nil = 取第一条。
     var webdavActiveID: String?
@@ -968,17 +925,7 @@ extension AppConfig.LlmProviders {
     }
 }
 
-/// ★ 2026-10-29 (饭耳移植 · 规格 §2.3 存储分层): the user's own WebDAV server.
-/// Presets (群晖/威联通/…) only prefill host/port/https + a setup hint — the
-/// protocol underneath is identical for all of them.
-///
-/// `password` is stored in the Keychain via `SecretStore.save(toKey: "webdav.password")`
-/// and stripped from `config.json` on save (ConfigService, same pattern as the
-/// cloud ASR secrets) — it exists in this struct only as the in-memory round trip.
 struct WebDAVConfig: Codable, Equatable, Identifiable {
-    /// ★ 2026-11-09（用户："选择 nas 或者其他都是用的同一个，没有区分每个品牌
-    /// 跟配置"）：多账户后每条配置的稳定标识——Keychain 密码槽、列表编辑、
-    /// 「当前使用」标记都靠它。旧配置解码时缺省生成一个，落盘即固化。
     var id: String = UUID().uuidString
     var host: String
     var port: Int
@@ -1056,10 +1003,6 @@ struct WebDAVConfig: Codable, Equatable, Identifiable {
     }
 }
 
-/// ★ 2026-11-09（用户："数据存储位置，需要一个设置就是可以选择上传哪些"）：
-/// 一个目的地要往服务器/文件夹里放哪些产物。录音走独立的 syncAudio 开关
-/// （它是"要拖带宽"的决定，和"要不要这份文件"分开），其余七类默认全开。
-/// 解码缺省 = 全开，老配置行为不变。
 struct UploadContent: Codable, Equatable {
     var transcript: Bool = true   // 转录全文.txt
     var asrJSON: Bool = true      // 转写数据.json

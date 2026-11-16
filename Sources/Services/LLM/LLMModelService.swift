@@ -333,10 +333,6 @@ struct LLMModelService {
             LLMRequestLog.record(req, code: code, millis: Int(Date().timeIntervalSince(started) * 1000),
                                  note: "models")
             guard (200..<300).contains(code) else {
-                // ★ 2026-11-04（用户："手机获取模型获取不到"）：只报 "HTTP 404" 时，
-                // 用户和我们都没法知道它到底请求了哪条地址——而 404 的成因九成是
-                // 地址拼错（多一层 /v1、少了 /compatible-mode、粘成了 Anthropic 那条）。
-                // 把 method + host + path 一起带出来，一眼就能看出问题。
                 return FetchResult(ok: false, models: [], error: "HTTP \(code) · \(shortURL(req))")
             }
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

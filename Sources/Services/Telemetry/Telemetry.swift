@@ -3,23 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "telemetry")
 
-/// Lightweight local telemetry for product events (★ 2026-10-22, 任务九).
-///
-/// ## Naming rules (mirrors Plaud's `analytics_events.txt` conventions, verified by grep)
-/// * Triple: `<screen>_<object>_<action>`, all lowercase + underscores —
-///   e.g. `record_live_caption_show`, `export_share_pdf_success`.
-/// * Colons are escaped as `_colon_` (Plaud: `filedetail_share_colon_export_notes_colon_click`).
-/// * Key conversions come in **success/failed pairs** — callers must emit both
-///   sides so drop-off is measurable. Helpers below enforce the shape.
-///
-/// ## Where events go
-/// The app has no backend yet, so events are appended as JSON lines to
-/// `Documents/telemetry-events.jsonl` (survives `apps pull`) and mirrored to
-/// the unified log (`log stream --predicate 'category == "telemetry"'`).
-/// The file is a diagnostic ring, not user data: it rotates at 512 KB by
-/// dropping the oldest half, the same budget `ticnote-ble.log` uses.
-///
-/// ⚠️ Never put secrets (keys / tokens / UDIDs / precise locations) in params.
 enum Telemetry {
 
     /// Gate every event through this rate (0...1]. Debug builds default to 1.0.

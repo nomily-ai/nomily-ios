@@ -4,26 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "asr.sensevoice")
 
-// MARK: - SenseVoice 本机转写（★ 2026-11-02 用户："增加一个下载使用 SenseVoice
-// 的语音转文字的下载，用户自行点击下载这个功能"）
-//
-// ## 是什么
-//
-// SenseVoice Small（阿里 FunAudioLLM 开源）经 sherpa-onnx 转成的 onnx 版本：
-// 一个模型覆盖 **中 / 英 / 日 / 韩 / 粤**，int8 量化约 230 MB，**完全离线**
-// 跑在手机上——没有 API Key、没有账户、没有流量。与苹果自带的
-// `OnDeviceASR`（SFSpeechRecognizer）互补：苹果那条不用下载但语种覆盖和
-// 标点质量看系统，这条下载一次后质量更稳、语种更多。
-//
-// ## 组成
-//
-//   · `SenseVoiceModelStore` —— 模型下载/删除/进度（ModelScope 主源 +
-//     huggingface.co 备源，国内直连优先）；
-//   · `SenseVoiceASR` —— 推理：复用 `OnDeviceASR.decode`（AVAssetReader
-//     解 Opus/m4a/wav → 16 kHz 单声道 PCM），按 30 秒切片喂
-//     sherpa-onnx 的 OfflineRecognizer，时间戳按切片偏移回填。
-//
-// 运行时二进制来自 SPM 包 `sherpa-onnx`（静态链接，见 project.yml）。
 
 /// 模型文件的落盘与下载状态。
 @MainActor

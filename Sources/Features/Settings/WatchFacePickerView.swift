@@ -2,16 +2,6 @@ import AVFoundation
 import SwiftUI
 import UserNotifications
 
-/// Apple Watch 设置菜单（★ 2026-10-30 用户："点击 Nomily 里面设置的 apple watch
-/// 手表表情需要放一个菜单而不是直接占满，因为这个相当于手表的设置"）。
-///
-/// 之前这一页**就是**表盘表情选择器本身：十几行表情铺满整页，而它其实是「手表设置」的
-/// 入口——用户进来先该看到"有哪些可以设"，再点进去改。现在这一页是一张菜单：
-/// 表盘表情（二级页 `WatchFaceStyleSettingsView`）、AI 怎么称呼你、定时录音、
-/// 回顾摘要与待办。
-/// ★ 2026-11-02（用户："手表录音质量这个板块需要放置到设置 APPLE Watch 里面
-/// 因为它只针对手表不针对录音卡设备"）：「手表录音质量（转写后）」分区自
-/// 录音与转写页整体搬入——档位选择 + 旧录音自动降级 + 每档试听。
 struct WatchFacePickerView: View {
     @EnvironmentObject private var configService: ConfigService
     @EnvironmentObject private var watch: WatchSyncService
@@ -62,11 +52,8 @@ struct WatchFacePickerView: View {
 
             timedRecordingSection
 
-            // ★ 2026-11-05：全天候录音开关（用户："nomily AI APP 设置也要有一个开关"）。
             allDayRecordingSection
 
-            // ★ 2026-11-06：表情常亮开关（用户："增加一个表情常亮让手表持续显示在首页
-            // 的设置在 app 里面"）。
             alwaysOnFaceSection
 
             // ★ 2026-11-06 二轮（"让脸活起来"）：眼睛形状 / 打瞌睡 / 瞳孔跟随。
@@ -85,11 +72,6 @@ struct WatchFacePickerView: View {
 
     // MARK: - 回顾摘要（★ 2026-10-30）
 
-    /// 用户："回顾摘要要支持在手机设置里面支持设置，在里面可以查看到待办，支持在手表里面
-    /// 点击可以同步到手机的待办里面"。
-    ///
-    /// 开关关掉时不仅停止推送，还会把手机上那份「待发回顾」清空并推一次空列表——
-    /// 否则手表上留着旧摘要，用户会以为开关没生效。
     private var recapSection: some View {
         Section {
             Toggle(isOn: Binding(
@@ -111,12 +93,6 @@ struct WatchFacePickerView: View {
 
     // MARK: - AI 怎么称呼你（★ 2026-10-30 自主设置页搬入）
 
-    /// 称呼。写进 `AppConfig.userName`，`JobRunners.withUserContext` 在每次
-    /// 摘要时带给模型（数据全局，只是入口归到 Apple Watch 设置页）。
-    /// ★ 2026-10-30（用户："AI 怎么称呼我我新增修改都没办法点击那个保存"）：
-    ///   原来 onChange 每敲一个字就写进 config，「保存」的 disabled 条件
-    ///   `draft == 已保存值` 恒成立 → 按钮永远点不了。改成：输入只动草稿，
-    ///   保存按钮 / 键盘回车才落盘；草稿与已存值不同时按钮可用。
     private var userNameSection: some View {
         Section {
             HStack(spacing: 12) {
@@ -207,9 +183,6 @@ struct WatchFacePickerView: View {
             }
 
             if configService.config.timedRecordingEnabled {
-                // ★ 2026-11-02（用户："需要设置什么时间段，例如一直录，跟设置
-                // 一个时间段录制"）：两种录制方式——一直录（开关打开立即录，
-                // 关掉才停）或按起止时间窗口录。
                 Picker(L10n.TimedRecording.modeRow, selection: Binding(
                     get: { configService.config.timedRecordingAlwaysOn },
                     set: { on in
@@ -288,13 +261,6 @@ struct WatchFacePickerView: View {
         }
     }
 
-    // MARK: ★ 2026-11-06 表情常亮
-    //
-    // 用户："手表这边可以增加一个表情常亮让手表持续显示在首页的设置在 app 里面"。
-    // 语义边界（诚实）：watchOS 7 起没有任何公开 API 能让 App 改"返回表盘时间"，
-    // 那由手表上的 设置 → 通用 → 唤醒屏幕 → 返回表盘时间 决定（可按 App 单独设置，
-    // 最长 1 小时）。这个开关管的是**暗显的那段时间**：画表情（默认，暗态停帧）
-    // 还是黑屏省电。录音中例外——workout 会话期间本来就一直常驻常显。
     private var alwaysOnFaceSection: some View {
         Section {
             Toggle(isOn: Binding(
@@ -555,38 +521,6 @@ struct WatchFacePickerView: View {
     }
 }
 
-/// Which expression the watch home face wears (Settings → Apple Watch → Home Face).
-///
-/// ★ added in 2026-10-16 revision thirteen (user: "the Nomily AI app's settings need one more
-///    is a setting for the watch home screen's eye expressions, bringing the gork bot expressions from the earlier github into
-///    the Nomily AI app's settings so their expressions can be used").
-///
-/// ★ 2026-10-20 extended with three more settings (user: "more expressions, and let the phone
-///    set its colour and blink pace, show the square frame, and let the face change on its own"):
-///    auto-cycle toggle, blink pace, eye colour, square frame. All four ride the same
-///    `updateApplicationContext` as the style (see `WatchSyncService.sendFaceSettings` — that
-///    call *replaces* the whole context, so every push must carry all five keys).
-///
-/// ★ 2026-10-30 二稿（用户："点击设置的 apple watch 手表表情需要放一个菜单而不是
-/// 直接占满，因为这个相当于手表的设置"）：本页退回**二级页**——Apple Watch 菜单
-/// （`WatchFacePickerView`）才是总入口，表情选择、闪烁节奏、颜色、方框都在这里改。
-///
-/// ## One row = one expression, and the left is what it **really** looks like
-/// The left of each row isn't an icon or text but **a directly drawn pair of eyes** —
-/// and it uses **exactly the same** drawing code as on the watch (`BotFacePair`).
-///
-/// ⚠️ This is the one thing on this page worth being strict about: an expression is something **you can't pin down by name**.
-///    "Shy" and "Sad" both take a sentence to explain in Chinese, yet drawn out they're told apart at a glance.
-///    More importantly, if the preview and the real hardware each drew their own, the user would pick a smiling eye on the phone
-///    and find a droopy one on raising the wrist — so sharing the same code in one file across both sides isn't about saving effort,
-///    it's a **correctness** requirement (the reasoning is at the top of `BotFaceStyle`).
-///
-/// ## Why the previews sit on a dark chip when a colour is picked
-/// The watch home face is drawn on the watch's dark screen. In light phone mode the form row is
-/// near-white, so a white/pale eye colour would be invisible right where the user is choosing it.
-/// When a custom colour is in force the preview therefore gets a small dark chip behind it —
-/// the closest a phone row gets to the real surface. No colour picked (`nil`) keeps the plain
-/// foreground-colour preview, same as before.
 struct WatchFaceStyleSettingsView: View {
     @EnvironmentObject private var configService: ConfigService
     @EnvironmentObject private var watch: WatchSyncService
@@ -653,8 +587,6 @@ struct WatchFaceStyleSettingsView: View {
             //   推送侧保持"不显示"（`watchFaceFrame = false`），旧手表端收到
             //   false 不会画框；watchFaceFrame 字段保留只为旧配置解码。
         }
-        // ★ 2026-10-30 二稿：本页退回「表盘表情」二级页——Apple Watch 菜单页
-        // 才是手表设置的总入口（用户："不要直接占满"）。
         .navigationTitle(L10n.Face.title)
         .navigationBarTitleDisplayMode(.inline)
     }

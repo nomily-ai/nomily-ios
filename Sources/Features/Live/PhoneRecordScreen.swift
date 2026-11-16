@@ -1,19 +1,6 @@
 import AVFoundation
 import SwiftUI
 
-/// Phone-microphone recording screen with live captions (★ 2026-10-22, 任务一).
-///
-/// Lives in the bottom「实时」tab next to the device paths (Plaud card / A1 /
-/// D·NOTE). Design follows Plaud's record card: big clock, level bars, one
-/// record button, and a **caption area** that shows the last committed
-/// sentences with the in-flight hypothesis in grey — the full transcript is
-/// right there scrolling, because hiding history behind a 3-line window was
-/// exactly the "跟不上/看不到" complaint that build 98 fixed for the card.
-///
-/// Save path on stop: the WAV goes straight into the library (`transport:
-/// "stream"` → `ClipSource.Kind.phone` badge), the live caption text is
-/// written as the clip's transcript (`{name}.txt` + minimal `.asr.json`), and
-/// the normal auto-transcribe / auto-summarize chain takes over from there.
 struct PhoneRecordScreen: View {
     @EnvironmentObject private var env: AppEnvironment
     @StateObject private var recorder = PhoneMicRecorder()

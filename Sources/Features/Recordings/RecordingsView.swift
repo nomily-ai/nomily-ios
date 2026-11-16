@@ -10,10 +10,6 @@ struct RecordingsView: View {
     @EnvironmentObject private var bluetooth: BluetoothCoordinator
     @EnvironmentObject private var library: Library
     @EnvironmentObject private var env: AppEnvironment
-    // ★ 2026-10-30（用户："资料库要在左边，首页的设备在右边"）：默认落点改到
-    //   资料库，但**老用户冷启动仍回设备页**——onAppear 里看台账：有"上一个
-    //   连接的设备"就跳到设备段（2026-10-28 的约定保持住）；台账为空的新用户
-    //   停在资料库，正好看到三条入门示例。
     @State private var segment: Segment = .library
     @State private var landingChecked = false
     @State private var pendingSegment: Segment?
@@ -32,8 +28,6 @@ struct RecordingsView: View {
     }
 
     enum Segment: CaseIterable, Identifiable {
-        // ★ 2026-10-30（用户："资料库要在左边，设备在右边"）：声明顺序 = 分段控件
-        //   从左到右的顺序，资料库在前。
         case library
         case device
         var id: Int { hashValue }

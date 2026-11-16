@@ -2,41 +2,6 @@ import Foundation
 import CryptoKit
 import os.log
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.3 存储分层 · 上传编排）
-///
-/// Decides *what* goes to the WebDAV destination and in which layout:
-///
-/// ```text
-/// /<basePath>/<yyyy-MM-dd> <主题>/摘要.md             ← 总结 + 章节，可编辑的明文（有总结时）
-/// /<basePath>/<yyyy-MM-dd> <主题>/待办.md             ← 摘要里抓出的行动项（有待办时）★ 2026-11-09
-/// /<basePath>/<yyyy-MM-dd> <主题>/思维导图.png        ← 渲染好的导图（有总结时）
-/// /<basePath>/<yyyy-MM-dd> <主题>/资料包.zip          ← 摘要 + 导图 + 待办 + 转写 一次性打包
-/// /<basePath>/<yyyy-MM-dd> <主题>/转录全文.txt        ← always (text syncs by default)
-/// /<basePath>/<yyyy-MM-dd> <主题>/转写数据.json       ← always (timing/speaker metadata)
-/// /<basePath>/<yyyy-MM-dd> <主题>/章节.json           ← when present
-/// /<basePath>/<yyyy-MM-dd> <主题>/<clip>.<ext>        ← only when 同步录音 is on
-/// ```
-///
-/// ★ 2026-11-03（用户："上传到 NC 的那个摘要这里面没有，如果是笔记的话这个
-/// 排版也不行" → 当天又改："是一个 MD 文档好点而不是 pdf 不可编辑"）：服务器上
-/// 放 **`摘要.md` 明文**——总结原文一字不改，前面加标题与日期行，后面附章节
-/// 时间轴。PDF 方案（`NotePDFRenderer`）保留作以后"导出/分享"能力，不再上传：
-/// 用户要的是能在网盘里直接改的文件。
-///
-/// ★ 2026-11-02（用户："上传…还需要根据时间跟当前的录音转写的主题进行设置
-/// 作为文件夹名称"）：不再按 transcripts/、audio/ 平铺——机器名文件在网盘里
-/// 根本认不出哪条是哪条（用户实测 142 个文件躺在服务器上却"没看到上传"）。
-/// 每条录音一个文件夹：日期取录音名里嵌的时间戳（`ticnote_20261023-135413`
-/// 这类前缀名也认得；取不到用转写文件 mtime），主题取 `<base>.title`（没有就
-/// 用录音文件名）。
-///
-/// Text-first is the spec's stance ("转写文本默认同步，音频可选"): a clip's
-/// readable value is its transcript; audio is the bulky half. Hooks:
-///   · `TranscriptionService.onTranscribed` → `sync(clip:)` per new transcript;
-///   · "立即同步" button → `syncAll()` sweeps every clip that has a transcript.
-///
-/// No upload queue of our own: re-running the sweep is the recovery path, and
-/// each pass is idempotent (PUT overwrites).
 @MainActor
 final class WebDAVSyncService: ObservableObject {
 
@@ -112,10 +77,6 @@ final class WebDAVSyncService: ObservableObject {
 
     // MARK: - Per-clip
 
-    /// Uploads the transcript pair (and audio when asked). Returns true if
-    /// anything was uploaded, false when the server already has it (HEAD 200)
-    /// — keeps repeated sweeps cheap.
-    /// ★ 2026-11-09：`content` 决定传哪些产物（用户："可以选择上传哪些"）。
     private func syncClip(_ clipName: String, client: WebDAVClient, syncAudio: Bool,
                           content: UploadContent) async throws -> Bool {
         var uploaded = false
@@ -201,12 +162,6 @@ final class WebDAVSyncService: ObservableObject {
             confirmed.insert(L10n.WebDAV.remoteTodos)
         }
 
-        // 思维导图.png：★ 2026-11-04（用户："思维导图直接就是生成的图"）。
-        // 用和屏幕上同一套管线渲染（解析 → 模板 → 折叠三层 → Core Graphics），
-        // 哈希没变就不重传。摘要不存在时跳过——没有大纲就没有图。
-        //
-        // ★ 渲染结果留着给下面的 资料包.zip 复用：同一条录音一轮里只为导图
-        //   付一次渲染成本（否则整轮同步的耗时几乎翻倍）。
         let summaryText = Self.summaryText(base: base, in: dir)
         let mapPNG: Data? = content.mindMap ? summaryText.flatMap { text in
             MindMapSnapshot.pngData(markdown: text, title: Self.readableTitle(base: base, in: dir))
@@ -232,12 +187,6 @@ final class WebDAVSyncService: ObservableObject {
             confirmed.insert(L10n.WebDAV.remoteMindMap)
         }
 
-        // 资料包.zip：★ 2026-11-04（用户："然后 NC 上传也是"）。
-        // 分享那套打包能力搬到网盘：散文件留着——网页端能直接读 md、看图；
-        // 包是给"整条拿走"用的，同事要一份会议资料时不用在文件夹里逐个下载。
-        // **不含音频**：音频本来就单独躺在同一个文件夹，再塞进包等于翻倍占空间。
-        // 时间戳固定用录音日期，否则 ZIP 头每次都变、下面这个哈希判重会永远失效。
-        // 没有摘要就不打——那种文件夹里只有一个转写 txt，打出来是个单文件包，没意义。
         let bundleOptions = ShareBundle.Options(
             includeAudio: false,
             modified: Self.recordedDate(base: base, in: dir),
@@ -269,13 +218,6 @@ final class WebDAVSyncService: ObservableObject {
             }
         }
 
-        // ★ 2026-11-02（用户："删除 NC 之前上传的那个自动文档重新上传"）：
-        // 改名后的收尾——新名字的文件确认在服务器上了，就把同一份内容的老
-        // 机器名（<base>.txt / .asr.json / .summary.md / .chapters.json）和已废弃
-        // 的 笔记.md（2026-11-03 改为 摘要.pdf）删掉，否则服务器上会同时躺着
-        // 两套名字，用户分不清哪个是新的。只在「新名字已就位」时才删；本地已
-        // 删掉的产物（比如手动删了章节）不碰服务器上的老副本——那可能是仅存
-        // 的备份。
         let legacyNames: [(old: String, new: String)] = [
             ("\(base).txt", L10n.WebDAV.remoteTranscript),
             ("\(base).asr.json", L10n.WebDAV.remoteASR),
@@ -306,11 +248,6 @@ final class WebDAVSyncService: ObservableObject {
         }
 
         if syncAudio {
-            // ★ 2026-11-04（用户："转化过的录音不要加密的"）：本地 `decrypted/` 里的
-            // .opus 其实已经是明文 Ogg，但**网盘客户端基本放不了它**（Safari、iOS/Windows
-            // 的 Nextcloud 都不认 Ogg-Opus），在网页上看起来就像一堆打不开的"加密文件"。
-            // 所以上传前统一转成 AAC/M4A：任何浏览器、任何手机都能直接点开听。
-            // 转换结果留在 decrypted/ 里复用，第二次同步不再转。
             let local = StorageLocations.decryptedDir.appendingPathComponent(clipName)
             let playable = StorageLocations.decryptedDir.appendingPathComponent("\(base).m4a")
             var audioLocal = local
@@ -324,10 +261,6 @@ final class WebDAVSyncService: ObservableObject {
             let remote = "\(folder)/\(remoteName)"
             if FileManager.default.fileExists(atPath: audioLocal.path),
                try await needsUpload(local: audioLocal, remote: remote, client: client) {
-                // ★ 2026-10-29 (饭耳移植 · 规格 §2.3): audio goes through the
-                // background session — a 30MB clip outlives any foreground
-                // grace period, and the daemon keeps uploading after the app
-                // is suspended. Directories first, in the foreground.
                 try await client.ensureDirectories(forPath: "\(client.basePath)/\(folder)")
                 WebDAVBackgroundUploader.shared.enqueue(fileAt: audioLocal, to: "\(client.basePath)/\(remote)", client: client)
                 uploaded = true
@@ -471,11 +404,6 @@ final class WebDAVSyncService: ObservableObject {
         let dateText = Self.folderDayFormatter.string(from: Self.recordedDate(base: base, in: dir))
         let meta = dateText + " · " + L10n.WebDAV.noteMeta
 
-        // ★ 2026-11-04（用户："摘要…md 格式文档上传到 nc 需要可读性"）：
-        // LLM 写出来的摘要常常自带一个 `# 标题`，直接拼进去就会和文档标题重复，
-        // 网盘里的 Markdown 目录也会出现两条同级标题。这里统一降一级，
-        // 再补一个 `## 摘要` 小节，让网页端渲染出来的层级是干净的。
-        // 逐行降一级（一次性映射，不能连做两次 replace——那样刚生成的 `##` 会被再降成 `###`）。
         let body = summary
             .components(separatedBy: "\n")
             .map { line -> String in

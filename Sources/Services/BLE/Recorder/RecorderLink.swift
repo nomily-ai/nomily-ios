@@ -155,18 +155,12 @@ struct RecorderDeviceInfo: Equatable {
     /// and even now that it does, don't show a 0% progress bar just because it's missing — that would look like "the card is full".
     let storage: RecorderStorageInfo?
 
-    /// Command code → the **raw reply payload** for that command (undecoded; UI can display hex directly).
-    /// Use the **live command code** as the key (TicNote uses the value of `TicNoteObservedCommand`).
-    /// Avoid static reverse-engineered values — so you don't have to maintain separate mappings for both directions.
     let rawReplies: [UInt16: Data]
 
     /// Human-readable supplementary notes (e.g., "Identity reply 61 B, field semantics unresolved").
     /// These are **explanations for users**, not logs: they should answer "why is there a block of hex here".
     let notes: [String]
 
-    /// ★ 2026-10-29（用户："录音豆和卡片是两个设备，要显示两个电量"）：
-    /// 第二个电量（如 D3200 的充电盒）。`nil` = 该协议没有/没读到，UI 不显示这一行。
-    /// 规则同 `batteryPercent`：读不到是 `nil`，不是 0。
     let secondaryBatteryPercent: Int?
 
     /// 第二个电量的名字（"充电盒"/"卡片"…）。`nil` 时 UI 用默认"充电盒"。
@@ -282,7 +276,6 @@ struct RecorderRecordingStatus: Equatable {
 // MARK: Errors
 
 enum RecorderLinkError: LocalizedError {
-    /// The protocol does not support this operation (as distinct from "not yet reverse-engineered")
     case unsupported(String)
     /// The transfer had gaps/conflicts; delivery is refused fail-closed
     case corrupted(String)

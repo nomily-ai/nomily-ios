@@ -1,14 +1,5 @@
 import Foundation
 
-/// 最小的 ZIP 打包器：**只存不压**（store，method 0），零第三方依赖。
-///
-/// ★ 2026-11-04（用户："把我当前总结、思维导图、待办都进行分享出去打包方式"）：
-/// iOS 没有系统级 ZIP 写入 API（`FileManager` 那个 `zipItem` 只在 macOS），
-/// 而这里要打的东西是 .md / .txt（几 KB）、.png 和 .m4a（本来就压过）——
-/// 再走一次 deflate 收益接近零，还要背上一个几万行的压缩库。
-///
-/// 所以只实现 ZIP 的"容器"部分：本地头 + 中央目录 + 结尾记录，CRC32 自己算。
-/// 产物是标准 zip，macOS 归档工具、Windows 资源管理器、任何解压软件都能直接打开。
 struct ZipWriter {
 
     private struct Entry {

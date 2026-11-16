@@ -1,23 +1,11 @@
 import SwiftUI
 
-/// ★ 2026-10-28（饭耳逆向规格 §1.4「常用词」）：词表编辑页。
-///
-/// 语义与饭耳一致（原文）：「只是提示，不会把别的词强行换成它」——footer
-/// 原话告诉用户这条边界。支持单条添加、滑动删除、批量导入、导出；上限 2000。
-///
-/// ★ 2026-10-29（用户："常用词汇里面从历史的文档里面提取，还有出现频率跟来源"，
-/// 截图 5 布局）：顶部搜索框；用量卡（已用 X/2000 + 近 7 天自动加了 N 个 +
-/// 看来源）；词行带出现次数与来源录音；来源详情 sheet；「从历史转写提取」
-/// 手动触发挖掘（另外首次启动 + 每周会自动挖一次，见 AppEnvironment）。
 struct VocabularyEditorView: View {
     @ObservedObject private var store = VocabularyStore.shared
     @State private var draft = ""
     @State private var notice: String?
     @State private var search = ""
     @State private var sourcesSheet: VocabEntry?
-    /// ★ 2026-11-02（用户："常用词汇要支持选择删除多选当前的很多没有用的"）：
-    /// 多选模式——自动挖掘总会混进一堆废词，逐条滑删太痛苦。进入多选后点词
-    /// 行即勾选，支持全选/反选，批量删除带确认（一次 persist）。
     @State private var multiSelect = false
     @State private var selected: Set<String> = []
     @State private var confirmDelete = false

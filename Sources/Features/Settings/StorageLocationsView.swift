@@ -1,16 +1,5 @@
 import SwiftUI
 
-/// ★ 2026-11-02（用户："应该是数据与存储位置，保存路径是这台 iPhone 或者
-/// iCloud，然后才是 NAS，然后就是文件夹 app 里面这样"）：
-/// 存储入口的**总枢纽**——四个落点按用户指定的层级顺序排布：
-///
-///   1. 这台 iPhone   —— 主存储，录音/转写/摘要永远先落在这里，不可关闭；
-///   2. iCloud 云盘   —— 自动云备份（经文件夹导出实现，选 iCloud 云盘内文件夹）；
-///   3. NAS (WebDAV)  —— 私有服务器自动备份；
-///   4. 文件夹 App    —— 导出到"文件"App 里的任意位置。
-///
-/// 「录音与转写」设置页顶部原来的三行（WebDAV / 导出到文件夹 / 存储占用）
-/// 收敛成本页一个入口；每行右侧带当前状态，不用点进去就知道配没配。
 struct StorageLocationsView: View {
     @EnvironmentObject private var configService: ConfigService
     // 文件夹备份状态（自动备份徽标要实时反映开关）。
@@ -20,8 +9,6 @@ struct StorageLocationsView: View {
 
     var body: some View {
         Form {
-            // ★ 2026-11-09（用户："是否是每条录音都传输吗…需要一个选择筛选"）：
-            // 自动上传范围——转写完成后哪些录音自动送到下面的目的地。
             Section {
                 Picker(L10n.StorageLocations.uploadScope, selection: Binding(
                     get: { configService.config.autoUploadScope ?? "all" },

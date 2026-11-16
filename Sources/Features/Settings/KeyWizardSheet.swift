@@ -1,20 +1,5 @@
 import SwiftUI
 
-/// ★ 2026-11-02（用户："每个 ASR 跟 LLM 里面不会获取 APIkey，在下面新增一个
-/// 不会开通？复制提示词跟粘贴结果，参考饭耳的这个快引导"）：
-///
-/// 「不会开通？」快引导——面向完全不会去控制台创建 API Key 的用户：
-///
-///   1. **复制提示词**：把一段预置的中文提示词复制出去，粘给手边任何
-///      AI 助手（豆包 / ChatGPT / Siri 写作工具…），让 AI 一步步教他
-///      到哪注册、在哪建 Key；
-///   2. **粘贴结果**：把 AI 的回复整段粘回来，App 自动从文本里认出
-///      凭据（带标签的 `API Key: sk-xxx` 行优先，纯 token 兜底），
-///      点「填入」回填到对应输入框。
-///
-/// 通用组件：LLM 单凭据（`apiKey`）和 ASR 多凭据（AK/SK、APPID…）
-/// 共用——`fields` 描述要回填哪些字段，`onApply` 由调用方写进各自的
-/// 配置存储。
 struct KeyWizardSheet: View {
 
     struct Field: Identifiable {

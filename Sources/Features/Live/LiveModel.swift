@@ -1174,12 +1174,6 @@ final class LiveModel: ObservableObject {
                     return
                 }
             case "custom":
-                // ★ 2026-11-04（用户："实时转录为啥不是我设置的自定义服务器"）：
-                // 自定义端点（OpenAI 兼容 / 百炼）没有 WS 双向流，只有
-                // `chat/completions` + `input_audio` 整段音频，所以这里走
-                // **5 s 切片准实时**（`BailianLiveASR`）。此前 custom 落到
-                // `default:` 被静默跳过，链路顺着 fallbacks 一路跑到 Azure，
-                // 用户配的服务器在实时里形同不存在。
                 if let custom = config.config.asrProviders.custom,
                    !custom.endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     let asr = BailianLiveASR(
@@ -1271,17 +1265,6 @@ final class LiveModel: ObservableObject {
         translatePartial = nil
     }
 
-    /// Seconds of audio captured so far — the number every **timestamp** in this
-    /// screen is stamped with (in-flight line, finished segments, marks).
-    ///
-    /// `internal` on purpose: `LiveView` stamps the in-flight partial line with it.
-    ///
-    /// ★★ 2026-11-04（用户："阿里云/百炼的实时有语音，但秒数计时不是正常读秒，只有
-    ///   Azure 正常"）：改成 `displaySeconds`（取"包数 / 卡片时钟 / 墙钟"三者最大值）。
-    ///   只取包数时，主线程被解码压住的那些批次会让时间戳成批跳/停住——字幕上的
-    ///   0:05、0:10 就会挤在一起。墙钟是与引擎无关的匀速来源，这一点比"严格等于
-    ///   已解码音频长度"更重要：用户读的是"我说这句话的时候是第几秒"。
-    ///   ⚠️ 落盘时长不读这个值（`saveAndCleanup` 用分段的 `end - start`）。
     var capturedDuration: TimeInterval { displaySeconds }
 
     // MARK: - event loops
@@ -1316,10 +1299,6 @@ final class LiveModel: ObservableObject {
                       self.currentASR == nil, let config = self.config else { return }
                 do {
                     try self.openASR(config: config)
-                    // ★★ 2026-11-04（用户："实时没有跟随设置的 ASR"的另一半）：
-                    //   回落本身是对的——主引擎连不通时总得有东西出字；
-                    //   错的是**不说**。旧逻辑换引擎后徽章悄悄从 Custom 变 Azure，
-                    //   用户只会觉得"我的设置没生效"。现在把这次顶替明说。
                     if self.activeProvider != failedProvider {
                         self.serviceNotice = L10n.ASR.liveFellBack(
                             from: failedProvider, to: self.activeProvider,

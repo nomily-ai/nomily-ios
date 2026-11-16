@@ -1,29 +1,6 @@
 import AVFoundation
 import SwiftUI
 
-/// 手表端：录一段自己的声音，传回 iPhone 注册声纹。
-///
-/// ★ 2026-11-04（用户："需要在 Apple Watch 里面加入一个声纹，录制声纹说话这样你能
-/// 区分是谁说话"）。
-///
-/// ## 为什么在手表上录，却不在手表上算
-/// 手表没有余量跑 MFCC + 逐帧 FFT（一条一分钟的样本就是几万帧），而这件事对实时性
-/// 没有任何要求——录完传回手机，手机在后台算完存起来就行。
-///
-/// ## 为什么用和录音**完全一样**的参数
-/// 声纹的全部依据是"这个人的声道特征"。采样率、码率、麦克风换了任何一个，特征都会
-/// 系统性地漂一点——注册样本和真实录音之间的这种漂移，正是轻量声纹最容易失败的地方。
-/// 所以这里的 `AVAudioRecorder` 参数**抄的是 `WatchRecorderModel.makeRecorder`**：
-/// 24 kHz / 单声道 / 48 kbps AAC。两边必须同时改，否则识别率会无缘无故掉下去。
-/// 手表端声纹注册的共享状态（页级单例）。
-///
-/// 为什么不放在 View 的 `@State`：手机回执到达时声纹页可能根本没开着
-/// （用户录完就退出了），`@State` 随页面销毁；回执需要落到一个**常驻**的地方，
-/// 下次进页面才显示得出来。`NomilyWatchApp` 把 `WatchLink.onVoiceprintResult`
-/// 接到 `apply` 上。
-///
-/// `pending` 与 `lastResultID` 落 UserDefaults：手表 App 被系统杀掉再打开，
-/// 不应该从"已发送"退回"开始录音"——样本其实已经在路上/已被注册。
 @MainActor
 final class WatchVoiceprintEnrollState: ObservableObject {
     static let shared = WatchVoiceprintEnrollState()
@@ -125,8 +102,6 @@ struct WatchVoiceprintView: View {
             .padding(.horizontal, 4)
         }
         .navigationTitle(L10n.Voiceprint.title)
-        // ★ 2026-11-06（用户："重新录制了声纹，但他下面还有声纹"）：进页面先清
-        // 上一轮的提示残留——旧文案挂在页面底部，读起来像"还有一条旧声纹"。
         .onAppear {
             enroll.status = nil
             errorText = nil
@@ -141,19 +116,6 @@ struct WatchVoiceprintView: View {
 
     // MARK: 按钮区（状态机）
 
-    /// ★ 2026-11-06（用户："录制完毕……不要展示开始录制的按钮"）：
-    ///
-    /// | 状态 | 显示 |
-    /// |---|---|
-    /// | 录制中 | 红色「完成」（唯一能提前结束的方式） |
-    /// | 已发送、等回执 | **大的开始按钮消失**，绿色"已发送"+ 小号「重新录制」 |
-    /// | 手机回执成功 | 绿色"声纹已更新" + 小号「重新录制」 |
-    /// | 手机回执失败 | 橙色失败提示 + 大的开始按钮（直接重录） |
-    /// | 太短/没声（未发出） | 错误提示 + 大的开始按钮 |
-    /// | 从未录过 | 大的开始按钮 |
-    ///
-    /// 关键语义：**样本已发出之后，大的"开始录音"不再回来**——它只会让人以为
-    /// 还要再录一条。想重录走小号「重新录制」（显式动作，清状态重新开始）。
     @ViewBuilder
     private var actionArea: some View {
         if isRecording {

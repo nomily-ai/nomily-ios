@@ -3,9 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "launch")
 
-/// ★ 2026-10-29 (饭耳移植): routes background-URLSession wake-ups to the
-/// WebDAV uploader. Exists solely for `handleEventsForBackgroundURLSession` —
-/// SwiftUI apps don't get an app delegate otherwise.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
@@ -22,9 +19,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct NomilyApp: App {
-    /// ★ 2026-10-29 (饭耳移植 · 规格 §2.3): background URL sessions wake the app
-    /// through the app delegate — SwiftUI needs this adaptor for
-    /// `handleEventsForBackgroundURLSession` (WebDAV audio uploads).
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     /// Stamped the moment this app's own code first runs, and compared against
@@ -59,16 +53,7 @@ struct NomilyApp: App {
         //   2. Logs from multiple launches are appended to the same file, and this line splits sections,
         //      so we can answer "which launch this record belongs to".
         TicNoteDiagLog.log("DIAG", "App launch — ticnote diagnostic start")
-        // ★ 2026-10-29 (饭耳移植): BGTaskScheduler registration must happen before
-        // launch finishes or iOS refuses it. The handler body waits for
-        // `NightlyTranscribeScheduler.shared.configure(...)` in `AppEnvironment.init`,
-        // which runs right after this — see that class for the full wiring map.
         _ = NightlyTranscribeScheduler.register()
-        // ★ 2026-10-30（用户："新人用户下载…需要一个介绍展示示例音频跟对应文档"）：
-        // 首次启动往资料库播三条示例（使用指南 / 欢迎信 / 带完整产物的示例会议录音）。
-        // ★ 2026-11-02：播种挪到 `LocalizedRoot` 的 language task——示例文案要跟随
-        //   界面语言（中英两套），而这里拿不到已解析的语言；那边还能在语言切换时
-        //   重写文本（`DemoContent.apply(language:)` 幂等）。
     }
 
     var body: some Scene {
@@ -135,10 +120,6 @@ private struct LocalizedRoot: View {
                     splashVisible = false
                 }
             }
-            // ★ 2026-11-02（用户："三条示例介绍需要跟随当前语言切换进行切换"）：
-            // 示例内容落盘按**当前界面语言**选资源；首启补齐、之后语言一变就重写
-            // 标题/摘要/大纲（音频与逐句转写不动）。放在这里而不是 App.init：
-            // 只有这里拿得到已解析的 effective 语言，且 `.task(id:)` 天然在切换时重跑。
             .task(id: localization.effective) {
                 let language = localization.effective
                 await Task.detached(priority: .utility) {

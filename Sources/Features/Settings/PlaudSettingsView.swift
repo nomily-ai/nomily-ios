@@ -1246,10 +1246,6 @@ struct PlaudDeviceDetailView: View {
     var body: some View {
         Form {
             DirectConnectSection(direct: direct)
-            // 任务八 · 8.1 — "find my card", the part that works with no
-            // firmware help. Lives on the device page (and therefore in the
-            // top-left info sheet) because "where did I leave it" is a property
-            // of this card, not of a recording.
             FindCardSection(direct: direct)
             // Same second mode as the add-device sheet: reachable from device
             // info too, so the cloud path is never hidden behind "add device".
@@ -1279,7 +1275,7 @@ struct PlaudDeviceDetailView: View {
     }
 }
 
-// MARK: - Find card (任务八 · 8.1)
+// MARK: - Find card
 
 /// Pure-App "find my card": last-seen time/place, three-tier RSSI proximity,
 /// and an optional drop notification.

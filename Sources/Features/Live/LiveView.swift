@@ -91,8 +91,6 @@ struct LiveView: View {
                 // level and record button instead of `LiveContent`.
                 PlaudLiveScreen(onRequestPhoneMic: { forcePhoneMic = true })
             } else {
-                // Nothing in play — the phone microphone is the fallback live
-                // source (任务一, 2026-10-22).
                 PhoneRecordScreen()
             }
         }
@@ -649,9 +647,6 @@ private struct LiveContent: View {
                     Spacer()
                 }
             } else {
-                // ★ 2026-11-09（用户：实时字幕页参考 Plaud / Vobot 优化）：
-                // 空态从"图标 + 右下角小按钮 + 弯箭头"改成 **hero 大按键**——
-                // 主操作就该长在拇指落点上，一眼可知这个页面是干嘛的。
                 VStack(spacing: 22) {
                     Spacer()
                     Button {

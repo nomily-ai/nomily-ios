@@ -146,14 +146,6 @@ final class AliyunLiveASR {
         if profile.packetBytes == SoundcoreOgg.frameSize {
             if liveDecoder == nil { liveDecoder = SoundcoreLiveDecoder() }
             let decoder = liveDecoder!
-            // ★★ 2026-11-04（用户："阿里云的实时转录有语音，但秒数计时不是正常读秒，
-            //   只有 Azure 正常"）：**解码曾经跑在主 actor 上**（`Task { @MainActor }`
-            //   里直接 `decoder.decode(batch)`）。25 帧一批、每 500 ms 一批，
-            //   JXOpus 解 25 帧 + 降采样正好压在主线程上——录音页的包计数
-            //   （`LiveModel.frames`）、读数、字幕重排全在同一个 actor，于是
-            //   读数变成"卡几秒、跳一大格"。
-            //   Azure 之所以正常，只是因为它的 `send()` 只是往 socket 写一帧，
-            //   没有任何 CPU 活。解码挪到后台，回主线程只做记账与投递。
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 let pcm = decoder.decode(batch)

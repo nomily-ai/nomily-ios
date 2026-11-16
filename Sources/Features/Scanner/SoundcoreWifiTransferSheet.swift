@@ -1,13 +1,5 @@
 import SwiftUI
 
-/// 录音豆（D3200）Wi‑Fi 快传的**独立页面** —— 对标 V05E 的 `FastTransferSheet`：
-/// 阶段状态 + 每文件进度行 + 取消/关闭，而不是藏在列表底栏里的一行字。
-///
-/// 传输逻辑仍住在 `RecorderSheet.runSoundcoreWifiExport()`（要接资料库入库、
-/// 删除豆上录音等一整套流程）；本页只是它的展示层，`model` 由那边填充。
-///
-/// 2026-10-29（用户："传输的时候需要参考 V05E 的那个 WiFi 快传，直接弹出一个页面
-/// 出来展示 WiFi 快传"）。
 struct SoundcoreWifiTransferSheet: View {
     @ObservedObject var model: SoundcoreWifiTransferModel
     var onCancel: () -> Void = {}
@@ -88,9 +80,6 @@ private struct SoundcoreWifiFileRow: View {
             HStack {
                 Text(row.name).font(.body.monospaced())
                 Spacer()
-                // ★ 2026-10-29（用户："显示 57.4MB，快传页显示 60.1MB"）：设备列表用
-                // `字节 / 1_048_576`（MiB 标成 MB），这里原来用十进制 MB——同一个数
-                // 两套单位。统一成列表口径，数字对得上。
                 Text(Self.sizeLabel(row.size))
                     .font(.caption).foregroundStyle(.secondary)
             }

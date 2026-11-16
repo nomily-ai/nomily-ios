@@ -3,16 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "storage-usage")
 
-/// ★ 2026-10-30（用户："录音文件大小在本地占用多少，nas 占用多少，iCloud
-/// 占用多少大小需要显示出来"）
-///
-/// 三处占用全部**实测**，不靠估算：
-///   · 本地 —— 递归统计 `audio_clips/`（加密原件 + 解密副本 + 转写文本）；
-///   · NAS —— 对 WebDAV 服务器发 PROPFIND，按服务器回报的字节数累加
-///     （★ 2026-11-02 起服务器布局是「日期 主题」每录音文件夹，这里改成
-///     从 basePath 递归统计；服务器不配合时给出失败原因）；
-///   · iCloud / 文件夹 —— 用已保存的安全作用域书签进到所选文件夹，
-///     统计 `transcripts/` + `audio/` 的实际磁盘占用。
 @MainActor
 final class StorageUsageService: ObservableObject {
 
@@ -26,15 +16,6 @@ final class StorageUsageService: ObservableObject {
         var failure: String?
     }
 
-    /// ★ 2026-10-30（用户："设备与资料库，显示统计那个设备记录时长，还有手表的，
-    /// 按照储存统计方式"）：按**来源**切一块的统计。
-    ///
-    /// 数据全部来自本机实盘：解密目录里每个录音文件的实际字节数 + 录音列表
-    /// 同一个时长缓存（`.durations.json`，按 size+mtime 命中，不重新探测）。
-    /// 来源判定用 downloads 清单里那条记录的 `transport`：
-    ///   · `ble` / `wifi` → 录音豆（按设备别名分组）
-    ///   · `watch` → Apple Watch
-    ///   · 其余（`import` / `stream` / 无记录）→ 导入与实时
     struct SourceStats: Identifiable, Equatable, Sendable {
         enum Kind: String, Sendable {
             case device, watch, imported

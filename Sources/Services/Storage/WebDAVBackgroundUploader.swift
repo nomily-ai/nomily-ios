@@ -3,29 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "webdav-bg")
 
-/// ★ 2026-10-29（饭耳移植 · 规格 §2.3 上传通道 · CFNetwork BackgroundSession）
-///
-/// Background `URLSession` for WebDAV uploads: audio files are the payload
-/// that actually needs this — a transcript is a few KB and the foreground
-/// path finishes it before the app can be killed, but a 60-minute recording
-/// at 29 MB/h is ~28 MB, and iOS suspends the app long before a foreground
-/// task of that size drains over cellular.
-///
-/// How it fits together (Apple's lifecycle, no shortcuts):
-///   · Session id `com.nomily.app.webdav.upload`, created once by the
-///     singleton (background sessions must outlive any view).
-///   · `enqueue` does the cheap `MKCOL` **in the foreground first** (the
-///     background task itself cannot be relied on for sequencing), then hands
-///     the PUT to the daemon.
-///   · When iOS needs to wake the app for session events (including relaunch
-///     after the app was killed), `AppDelegate.handleEventsForBackgroundURLSession`
-///     routes into `handleEvents(completionHandler:)` — that call chain is
-///     what keeps the process alive while the delegate finishes.
-///   · Per-task results arrive in `didCompleteWithError`; the sync page picks
-///     them up via the `webdavBackgroundUploadDidFinish` notification.
-///
-/// Transcripts deliberately stay on the foreground path in
-/// `WebDAVSyncService` — only audio is queued here.
 final class WebDAVBackgroundUploader: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
 
     static let shared = WebDAVBackgroundUploader()

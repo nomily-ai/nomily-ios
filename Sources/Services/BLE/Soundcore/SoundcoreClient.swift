@@ -409,10 +409,6 @@ final class SoundcoreClient: NSObject, ObservableObject {
         progress: ((_ received: Int, _ expected: Int) -> Void)? = nil
     ) async throws -> Data {
         try await runExclusive {
-            // ★ 2026-10-28（用户："传输的录音有一段直接卡住"）：实时会话异常收尾时
-            // realtimeFileId 可能残留（linkLost 分支、liveStop 被 10s 兜底取消）——
-            // dispatchTransport 会把之后所有切片路由进没人消费的实时桥，pullFile
-            // 就永远收不到数据，90 秒后报"传输不完整"。拉取前强制解除实时绑定。
             if let stale = realtimeFileId {
                 log.info("pullFile: clearing stale realtime binding file=\(stale, privacy: .public)")
                 crypto.clearFile(stale)

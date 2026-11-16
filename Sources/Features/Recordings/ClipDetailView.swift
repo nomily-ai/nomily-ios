@@ -76,7 +76,6 @@ struct ClipDetailView: View {
     @State private var showVADPreview = false
     @State private var showMindMap = false
     @State private var showExportChoice = false
-    /// ★ 任务二 (2026-10-22): email-with-attachments sheet.
     @State private var showMailExport = false
     /// ★ 2026-11-04（"把我当前总结、思维导图、待办都进行分享出去打包方式"）：
     /// 一条录音打成一个 zip 走系统分享。三件套分开发，收件人要来回翻三个附件。
@@ -122,13 +121,6 @@ struct ClipDetailView: View {
     @State private var tracedSegmentStart: Double?
     /// 让 ScrollViewReader 滚过去的目标行（onChange 消费后清空）。
     @State private var traceScrollTo: Double?
-    /// Q&A state lives in the page, not in the section: the input bar is pinned to the bottom
-    /// while the answers stay in the scrolling list.
-    /// ★ 2026-11-04（用户："转录后的摘要来源笔记里面的底部的提问怎么没了，原来有，来源下面的提问也没了"）：
-    ///   入口条回来了，但**换了挂载方式**——不再 `overlay` 悬浮，改用
-    ///   `.safeAreaInset(edge: .bottom)`，条子占自己的高度、内容区自动让位。
-    ///   2026-10-30 删它的理由是"方框挡住了待办输入行"，那是悬浮才有的毛病；
-    ///   参与布局之后就不存在遮挡。
     @StateObject private var aiChat = AIChatModel()
     @State private var showAskSheet = false
     /// ★ 2026-10-23 ("生成的摘要需要能够支持编辑点击能够写入修改"): tap 编辑 on a
@@ -252,16 +244,6 @@ struct ClipDetailView: View {
         // recording detail page wastes the bottom strip on navigation the user has already
         // made a decision about — and the Q&A bar needs that strip.
         .toolbar(.hidden, for: .tabBar)
-        // ★ 2026-10-30（用户第二次点名："方框不是删除了，为啥直接在我手机上显示"）：
-        //   当年删的是**悬浮**版本——它压在页面底部，把待办输入行挡住，所以被撤掉。
-        // ★ 2026-11-04（用户："来源下面的提问也没了"）：入口条回来了，改成
-        //   `.safeAreaInset(edge: .bottom)` 参与布局，不再叠在内容上。见 `askBar`。
-        // ★ 2026-10-15: The detail page counts as "opened" the moment it appears, and the red dot on the list row goes away with it.
-        //
-        // Hooked here rather than in the list's tap callback: the detail page has several entry points (library,
-        // recording list, live page), and a tap callback would only cover one of them —
-        // users opening it from elsewhere would find the dot still there, as if nothing happened. This is the single spot, and it will never
-        // miss a new entry point.
         .onAppear { ClipReadStore.shared.markSeen(name: item.name) }
         // ★ 2026-10-23 ("参考一下页面布局跟结构"): 来源 | 笔记 sit in the centre of
         // the navigation bar, Plaud's way — no separate strip under the title.
@@ -283,9 +265,6 @@ struct ClipDetailView: View {
                         }
                         .disabled(activeJob(.export) != nil)
                     }
-                    // ★ 2026-10-22 (任务二): document export — txt / md / pdf,
-                    // plus the mail-with-attachments entry Plaud's
-                    // `Workflow_send_email_attachments_*` proves out.
                     if transcript != nil || summary != nil {
                         Menu {
                             Button(L10n.ClipDetail.exportAsTXT) { enqueueDocumentExport("txt") }
@@ -401,10 +380,6 @@ struct ClipDetailView: View {
             languages.fetchTargetLanguagesIfNeeded()
             transcript = TranscriptDocument.load(for: item.name)
             chapters = ClipChapterStore.load(for: item.name)
-            // ★ 2026-11-02（用户："欢迎来到 Nomily AI 点击进去来源没内容需要直接跳转到
-            //   笔记有内容的页面，如何使用 Nomily AI 也是"）：纯文档片段（示例里的欢迎信、
-            //   使用指南）没有音频也没有转写，「来源」那一页就是空白——默认落「笔记」，
-            //   那里才是这类片段的全部内容。有音频的片段维持原行为（来源里就是播放器）。
             if !item.hasAudio, transcript == nil, detailTab == .source {
                 detailTab = .notes
             }
@@ -1204,9 +1179,6 @@ struct ClipDetailView: View {
             let todos = pages
                 .compactMap { NotePages.text(of: $0, for: item.name) }
                 .flatMap { TodoExtract.fromSummary($0) }
-            // ★ 2026-10-30（用户："待办支持手写待办不只是总结出来的待办"）：
-            // 只要转写过就显示待办区——没有摘要待办时也能自己写一条，
-            // 不能因为"AI 没提取到"就把整个入口锁死。
             if !todos.isEmpty || transcript != nil {
                 // ★ 2026-10-23: checklist rows with a tap-to-strike circle.
                 // ★ 2026-10-30: 每行行尾加「跳到原文」。
@@ -1609,11 +1581,6 @@ struct ClipDetailView: View {
                 if isEditingSummary {
                     summaryEditor
                 } else {
-                    // ★ 2026-11-03 九轮（用户："摘要显示不够清楚，页面不够美观简洁，
-                    //   根据内容自动生成合适的模板"）：换成 `SummaryDocView`——
-                    //   它先按 `##` 分节、按标题信号判体裁（会议/问答/行动/笔记），
-                    //   再决定导语字重、章节竖条、待办是否置顶。旧的 `MarkdownBlocksView`
-                    //   仍是待办页与思维导图预览的渲染器，没有删。
                     SummaryDocView(blocks: MarkdownTable.fold(MarkdownBlocks.parse(text)), onTrace: traceToSource)
                         // 长按正文也能进编辑——用户直觉是"点摘要本身改它"，
                         // 而不是先去找标题栏那枚按钮。
@@ -1662,11 +1629,6 @@ struct ClipDetailView: View {
                 Text(L10n.ClipDetail.summary)
                 Spacer()
                 if currentPageText != nil {
-                    // ★ 2026-10-23 ("生成的摘要需要能够支持编辑"): one pencil next
-                    // to 重新生成 — tap to edit, save writes the file back.
-                    // ★ 2026-10-30（用户："知识库里面笔记来源要支持能够直接在摘要
-                    // 进行编辑"）：原来只有一枚小铅笔，几乎看不见。这里改成带文字的
-                    // 「编辑」，并在摘要正文上挂长按菜单——两个入口都通向同一个编辑器。
                     Button {
                         editedSummary = currentPageText ?? ""
                         isEditingSummary = true
@@ -1910,9 +1872,6 @@ struct ClipDetailView: View {
         jobs.enqueue(Job.export(clip: item.name, format: format))
     }
 
-    /// ★ 任务二 (2026-10-22): document formats ride the same export job id
-    /// ("export:<clip>") — only the last-picked format is kept, matching the
-    /// audio behaviour and the single-slot staging directory.
     private func enqueueDocumentExport(_ format: String) {
         pendingExportShare = true
         jobs.enqueue(Job.export(clip: item.name, format: format))

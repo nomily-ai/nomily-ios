@@ -122,18 +122,10 @@ enum StorageLocations {
         root.appendingPathComponent("summarize_templates.json", isDirectory: false)
     }
 
-    /// ★ 2026-10-28（饭耳逆向规格 §1.4）：常用词表——用户维护的专名提示
-    ///（人名/产品名/术语），喂给 AI 整理 prompt（「只是提示，不会强行替换」）。
-    /// 放 `root`（工作数据，不是某条录音的产物）。
     static var vocabularyURL: URL {
         root.appendingPathComponent("vocabulary.json", isDirectory: false)
     }
 
-    /// ★ 2026-11-06（饭耳 1.0 移植 P0-1）：待办看板的卡片库。
-    ///
-    /// 放 `root` 而不是某条录音的目录里：待办是**跨录音**的账本（"我欠了什么"），
-    /// 它的生命周期比任何一条录音都长——删掉来源录音不该把"这件事我还没做"也删了。
-    /// 卡片自己保存 `recordingName`，跳播放时找不到音频就降级成纯文本。
     static var todoBoardURL: URL {
         root.appendingPathComponent("todo-board.json", isDirectory: false)
     }

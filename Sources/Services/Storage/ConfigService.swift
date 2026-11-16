@@ -179,9 +179,6 @@ final class ConfigService: ObservableObject {
         // ★ 2026-10-29 (按截图补齐): Kimi / 智谱 GLM / MiniMax。
         ("kimi", .llmKimi), ("zhipu", .llmZhipu), ("minimax", .llmMiniMax),
     ]
-    /// ★ 2026-10-29 (饭耳移植): WebDAV password Keychain key (string-keyed slot).
-    /// ★ 2026-11-09 多账户：每个账户一条独立槽（`webdav.password.<id>`）；
-    /// 旧的单槽键保留——迁移过来的第一条账户在 restore 时从这里捞回密码。
     static let webdavPasswordKey = "webdav.password"
 
     /// 每账户密码槽：同一家 NAS 配两台、两家 NAS 各存各的，互不覆盖。
@@ -211,9 +208,6 @@ final class ConfigService: ObservableObject {
             }
         }
         SecretStore.save(config.wifiAP?.psk, to: .wifiAPPassword)
-        // ★ 2026-10-29 (饭耳移植): WebDAV password never touches config.json.
-        // ★ 2026-11-09 多账户：每条已保存账户各存各的槽；旧的单槽键继续写
-        //   「当前使用」那条（老版本 App 读回来还能用）。
         if let accounts = config.webdavAccounts {
             for account in accounts {
                 SecretStore.save(account.password, toKey: Self.webdavPasswordKey(accountID: account.id))
@@ -286,10 +280,6 @@ final class ConfigService: ObservableObject {
         if config.wifiAP != nil {
             config.wifiAP?.psk = SecretStore.load(.wifiAPPassword) ?? ""
         }
-        // ★ 2026-10-29 (饭耳移植): WebDAV password round trip (Keychain).
-        // ★ 2026-11-09 多账户：每条账户从自己的槽里捞回；迁移过来的第一条
-        //   没有独立槽时回落旧单槽键（老版本写入的位置），捞到后立刻固化
-        //   到自己的槽，下次就不再依赖旧键。
         if var accounts = config.webdavAccounts {
             let legacyPassword = SecretStore.load(key: Self.webdavPasswordKey)
             for index in accounts.indices {

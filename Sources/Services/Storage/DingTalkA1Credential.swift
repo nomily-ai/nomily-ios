@@ -14,8 +14,7 @@ private let log = Logger(subsystem: "com.nomily.app.ios", category: "a1.credenti
 //     token = AES-128-CBC(key = ASCII(secret[0..16]), iv = key, pt = the device's 32-char random)
 //
 // and that `secret` is a **device-level credential minted by DingTalk when the card is
-// bound to an account**. It is not derived from the SN, the DID or the MAC (three separate
-// attempts, see the A1 reverse-engineering notes §3.1), it is never sent over
+// bound to an account**. It is not derived from the SN, the DID or the MAC, it is never sent over
 // BLE (§3.3), and one card's secret answers `501` on another card.
 //
 // So "using an A1 without DingTalk" always has exactly one unavoidable step: obtain the

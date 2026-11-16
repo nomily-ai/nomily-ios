@@ -350,12 +350,6 @@ final class BailianLiveASR {
         decoding = true
         let batch = decodeQueue.removeFirst()
 
-        // 160 B 帧：JXOpusDecoder 直解 + 降 16 kHz，与 `AliyunLiveASR` 同一条
-        // 已验证的解码链（`SoundcoreLiveDecoder` 注释里有真机实测记录）。
-        //
-        // ★★ 2026-11-04：解码**不能在主 actor 上做**。这条链每 500 ms 解 25 帧，
-        //   压在主线程上会让录音页的包计数/读数一卡一跳（用户："百炼的实时有语音，
-        //   但秒数计时不是正常读秒"）。和 `AliyunLiveASR` 同一处修正。
         if profile.packetBytes == SoundcoreOgg.frameSize {
             if liveDecoder == nil { liveDecoder = SoundcoreLiveDecoder() }
             let decoder = liveDecoder!

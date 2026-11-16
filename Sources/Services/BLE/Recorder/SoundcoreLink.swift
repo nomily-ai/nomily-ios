@@ -50,10 +50,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
     /// 最近一个切片的序号——App 内打点的 offset 锚点（seq × 20 ms）。
     private var liveLastSeq = -1
 
-    /// ★ 2026-10-30（用户："把后台划了重新打开，录音时长就重新开始计算了"）：
-    /// 最近一次确认的「豆上正在录的文件」id。来源优先级见 `recordingElapsed`；
-    /// keep-alive 在录音中且未知时用列表的 `currentTransportTimestamp` 补一次
-    /// （豆自己按键开录、App 划掉重连的场景只有列表能给）。
     private var currentFileId: UInt32?
 
     init(peripheral: CBPeripheral, central: CBCentralManager) {
@@ -89,10 +85,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "MM-dd HH:mm"
-        // ★ 2026-10-28（用户："历史录音提示还在录制中……其实早就结束了"）：
-        // 「在录」判定必须以**设备当前是否在录音**为前提。此前只看
-        // `endTime == 0`，而固件对已结束的文件也大量写 0（截图中 10-27 那条同样
-        // 被误判），于是那些文件既不能删也不能传，永远卡在"结束录音后再传输"。
         let deviceRecording = client.pushedRecording ?? client.lastDeviceInfo?.recording ?? false
         return list.files.map { entry in
             let startedAt = entry.fileIdAsEpochSeconds.map { Date(timeIntervalSince1970: TimeInterval($0)) }
@@ -151,13 +143,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
         }
     }
 
-    /// Raw 160-B Opus frames → 可直接播放的音频。
-    ///
-    /// ★ 2026-10-27（用户："录音都是 0s…里面的录音听着也有问题"）：不再走
-    /// `Mp3Convert` 的 Ogg→mp3（那是 PLAUD 16 kHz/80 B 的口径，豆是 48 kHz/160 B，
-    /// 解出来既变调又没时长元数据）。现在逐帧 `JXOpusDecoder` 解成 PCM 再封 AAC/m4a
-    /// —— 时长精确、iOS 16 起全系统可播（详见 `SoundcoreTranscoder`）。
-    /// 转码失败回落 `.opus`（iOS 17 可播、转写不受影响），fail-open。
     func containerize(_ raw: Data, for recording: RecorderRecording) throws -> RecorderClip {
         if let out = SoundcoreTranscoder.transcode(raw) {
             return RecorderClip(
@@ -177,13 +162,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
         )
     }
 
-    /// 删除豆上的一条录音（0x1A/0x10），**删完回读列表仲裁**。
-    ///
-    /// ★ 2026-10-27（用户："点击删除还没办法删除在卡片的录音"）：0x1A/0x10 的应答
-    /// 只说明「命令收到了」，豆在录音/传输占用时不会真的删，之前把应答当成功，
-    /// 列表刷新后录音还在，用户看到的就是"点了没反应"。现在：
-    ///  1. 正在录的那条直接拒绝（官方实现同样锁住，豆也不接受删在录文件）；
-    ///  2. 发完命令回读文件列表，fileId 还在就抛错——报告的是设备的真实状态。
     func deleteRecording(_ recording: RecorderRecording) async throws {
         guard let fileId = UInt32(recording.id) else {
             throw RecorderLinkError.malformed("bad D3200 file id: \(recording.id)")
@@ -231,9 +209,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
                 freeBytes: Int64(free) * 1024
             )
         }
-        // ★ 2026-10-29（用户："录音豆和卡片/充电盒是两个设备，要显示两个电量"）：
-        // D3200 的设备信息本来就带两个电量——`battery`（豆本体）和 `boxBattery`
-        // （充电盒）。以前 `??` 合并只显示一个；现在主行显示豆本体，第二行显示充电盒。
         let beanBattery = info.battery
         let caseBattery = beanBattery != nil ? info.boxBattery : nil
         return RecorderDeviceInfo(
@@ -280,20 +255,6 @@ final class SoundcoreLink: NSObject, RecorderLink {
 
     var pushedChargingState: Bool? { client.pushedCharging }
 
-    /// ★ 2026-10-30（用户："把后台划了，重新打开录音时长就是重新开始计算了"）：
-    /// 豆的 **fileId 就是这段录音开始那一刻的 Unix 秒**（`LiveModel` 一直这么用，
-    /// 日志里的 fileId 与录音日期一一对应），所以
-    ///
-    ///     已录时长 = 当前时间 − fileId
-    ///
-    /// 是豆侧真相，且**不需要豆回报任何新东西**——重连后第一个切片就能对表。
-    /// 此前 `RecorderLink.pushedElapsed` 走协议默认 `nil`、`readRecordingStatus`
-    /// 也不填 `deviceElapsed`，`RecorderSessionModel` 对 D3200 无钟可采，
-    /// 重开后秒表只能锚定"现在"——秒表从 0 重数且永不追上，就是本 bug。
-    ///
-    /// fileId 来源优先级：实时转录的活动文件（最权威）→ live 会话缓存 →
-    /// 列表确认的当前文件 → 开始录音推送。非录音态返回 nil（不供旧值）。
-    /// 负数 / 超过一天 = 豆时钟不可信，宁可不给（宁缺毋滥，避免秒表乱跳）。
     private var recordingElapsed: TimeInterval? {
         guard pushedRecordingState == true else { return nil }
         let fid = client.activeRealtimeFileId ?? liveFileId ?? currentFileId ?? client.lastNewFileId

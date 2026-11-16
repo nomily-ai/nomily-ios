@@ -1,84 +1,7 @@
 import CoreBluetooth
 import Foundation
 
-// MARK: - TicNote recording card (NE-79) adapter
-//
-// Fact source: official App `com.mobvoi.ticnote` static reverse engineering (DEX + Dart AOT snapshot + native SO).
-// Complete evidence (including source file and line number for each conclusion) see `ticnote-re/protocol-notes.md`.
-//
-// ┌────────────────────────────────────────────────────────────────────┐
-// │ Status (Round 8: protocol layer integrated into App, and real-device capture nailed the protocol byte by byte)        │
-// │  GATT layer ✅|advertising identification ✅|frame format ✅|file list (0x1A) ✅              │
-// │  connection sequence / no fragmentation / mtu-3 ✅｜write type ✅ without response                     │
-// │  ★ read file command = 0x1C (not the statically guessed 0x38)✅ real-device proof             │
-// │  ★ voice frame = 90 bytes [0x02][sid u32][offset u32][len u8][80B] ✅      │
-// │  ★ recording record = 160 bytes = 20 ms ✅                                   │
-// │  ✅ audio **unencrypted**: plain Opus — 160 B/packet, TOC always 0xBC          │
-// │     (CELT wideband 20 ms stereo), 64 kbps, 3522 packets = 70.44 s           │
-// │     Evidence: official Opus2Ogg (+9600 per page) + ffmpeg extracts voice + afinfo verifies  │
-// │  ★★ end-to-end playback ✅: real-device capture whole segment fed to `TicNoteSession`, 353 requests one by one     │
-// │     reconciliation + 563,520 bytes + Ogg 576,664 B all match byte-for-byte with independent Python implementation  │
-// │     consistent (self-check §18, 49 assertions)                                     │
-// │  ★ integrated into App: registry driver scan + `TicNoteLink` (CoreBluetooth) +       │
-// │     scan page "Recorders" section (Beta tag) + download and store (self-check §19)       │
-// │  ⏳ remaining tasks: run end-to-end on real device once / broadcast pairing / iOS playback / Wi‑Fi fast transfer  │
-// │     ⇒ `isVerified` still false, but **reason changed** (see file end `exposure`)  │
-// └────────────────────────────────────────────────────────────────────┘
-//
-// Key source quick reference:
-//   ── Real-device capture (hardest) ──────────────────────────────────────────────
-//   captures/btsnoop_20261008_134057_d.cfa   session 0x6AC74377 full download
-//   captures/att-stream2.txt                 ATT stream exported by tshark (8543 packets)
-//   tools/decode_att2.py                     frame-level decoding + entropy detection
-//   tools/frame_detail.py                    detailed parsing of 0x02 / 0x1C / 0x1A
-//   tools/rebuild_audio.py                   reconstruct file by offset + envelope determination
-//   tools/crypto_forensics.py                keystream periodicity / bitplane / chi‑square
-//   tools/try_opus.py                        5 Opus hypotheses → Ogg → ffmpeg
-//   ── Dart AOT snapshot (libapp.so, blutter disassembly) ─────────────────────
-//   watch_audio_command.dart  —— 20 buildXxx() constructors, the sole authority on command bytes
-//   watch_audio_parser.dart   —— parse() / _parseVoiceData() / _readShort()
-//   watch_audio_service.dart  —— _sendCommand() / _handleClipDeviceData() dispatch table
-//   ── Java/Kotlin DEX ──────────────────────────────────────────────
-//   com/mobvoi/watch_plugin/WatchPlugin.java
-//        · parseScanRecordForSN(byte[])  ← SN parsing in advertising (advertising identification authority)
-//        · createScanDeviceMap()         ← field names sent to Dart from scan results
-//        · handleSendDataToClipDevice()  ← Dart method channel entry point
-//   com/mobvoi/watch_plugin/RecordingDeviceManager.java
-//        · sendDataToClipDevice → UteBleClient.getUteBleConnection().sendDataToClipDevice
-//   com/yc/nadalsdk/ble/open/UteBleConnection.java   ← interface definition
-//   utejxif/utejxif.java        ← **UTE SDK full BLE UUID constant table**
-//   utejxdo/utejxif.java        ← connection management + vendor write channels + notify registration dispatch + CCCD write
-//   utejxdo/utejxtry.java       ← ClipDevice's BluetoothGattCallback (connection/MTU/write callback sequence)
-//   utejxdo/utejxfor.java       ← external façade for sendDataToClipDevice / JlDevice / OLVDevice
-//   utejxfor/utejxtry.java      ← final forwarding of ClipDevice write channel (3 lines)
-//   utejxbyte/utejxtry.java     ← ⚠️ SDK's **sub‑packetizer** (SubPackageUtil), belongs to 0x01 dialect, **not used by this card**
-//   utejxint/utejxdo.java       ← ⚠️ another recording device dialect (type=0x01), **not** this card's
-//   ── Native SO (Round 5 new findings) ──────────────────────────────────────
-//   libnveasysdk.so   · `_Z7initKeyv` = initKey(), seeded with `/dev/urandom`
-//                       `std::random_device` generates **16‑byte random key**;
-//                       `Java_com_nveasy_ble_Auth_init/_auth/_encrypt` + `AES_ECB_decrypt`
-//                       + `aes_encryption_cbc` are all part of this **session handshake**, not audio keys.
-//   libnveasyopus.so  · `Java_com_nveasy_audio_Opus_*` + CodecOpus — used for local encoding/decoding
-//                       (App side converts PCM to wav/mp3/opus/aac), does not indicate the device-side format.
 
-// MARK: - Write characteristic type (third correction)
-//
-// ⛔ **This section has been disproved by real-device capture (2026-10-08).**
-//
-// Static reverse engineering reasoning: UTE native write path lacks `setWriteType` → falls back to Android default
-// `WRITE_TYPE_DEFAULT`(2) = write with response. The reasoning itself is correct, **but the premise is wrong** ——
-// The official App's application-layer commands do not go through that native path at all, but use Dart's
-// `flutter_reactive_ble`（`writeCharWithoutResponse` → `setWriteType(1)`）。
-//
-// **Real-device HCI log (btsnoop_20261008.cfa) behavior evidence:**
-//   · `0x52` Write Command (without response) = **14 times**, all are application-layer command frames
-//   · `0x12` Write Request (with response) = only 2 times:
-//       - one is `01 1D 00` (getSessionState, see `TicNoteObservedCommand`)
-//       - one is writing CCCD (0x2902), which should use a write with response
-//   · The characteristic's own properties are `WRITE | WRITE NO RESPONSE` (both allowed)
-//
-// → **iOS side uses `.withoutResponse` as the default write type**;
-//   `.withResponse` is reserved for CCCD and single initialization commands that require reliable delivery.
 
 
 // MARK: - GATT constants
@@ -904,10 +827,6 @@ enum TicNoteCommand: UInt16 {
 
 // MARK: - Command newly confirmed by real-device capture (2026-10-08, vivo V2172A / Android 15 + btsnoop)
 
-/// These command codes **are not** in the official App's Dart distribution list (so static reverse engineering didn't see them),
-/// All come from real-device HCI log `btsnoop_20261008.cfa` ATT stream decoding (see
-/// `ticnote-re/captures/att-decoded.txt`). Frame structure matches the known
-/// `[type][cmd u16 LE][payload]` is completely identical.
 enum TicNoteObservedCommand: UInt16 {
     /// App→Card `01 01 00 02 01 00` (query) / `… 01 <16B bondID> <len> <UTF-8 name>`
     /// In real-device sample, bondID = "1234567890000000", name = "clip c1 pro" (13 bytes)
@@ -1727,41 +1646,6 @@ enum TicNoteRecordingScene {
 
 // MARK: - Storage Usage (cmd 0x06)
 
-/// Card **used / total** capacity. Response payload is **fixed at 13 bytes**:
-///
-/// ```
-/// 01 06 00 | 00 e2 a3 03 | 00 0d a2 03 | 40 9c 00 00 | 00
-///            └ total     ┘ └ free      ┘ └ semantics unresolved ┘ └ state
-///            u32 LE, KB    u32 LE, KB    u32 LE         u8
-/// ```
-///
-/// ## This is established by "tri-source cross-referencing", not guessed
-///
-/// **① Official data class** (`decompiled/classes6/…/bean/recorder/DeviceStorageInfo.java`):
-/// ```java
-/// public DeviceStorageInfo(long total, long free, long recSizePs, int freeSizeState)
-/// public static final int HAS_FREE_SPACE = 0;
-/// public static final int NO_FREE_SPACE  = 1;
-/// ```
-/// → The constructor order is `total, free, recSizePs, state`, **corresponding one-to-one with the 13 bytes above**.
-///
-/// **② Real device sample** (`captures/hci-all/btsnoop_20261008.att.txt` #32162, t=4020.8502080):
-/// ```
-/// total = 0x03A3E200 = 61,071,872 KB × 1024 = 62,537,596,928 B = 58.24 GiB
-/// free  = 0x03A20D00 = 60,951,808 KB × 1024 = 62,414,651,392 B = 58.13 GiB
-/// used  = total − free = 120,064 KB = 117.25 MB
-/// ```
-/// **③ Official App's own display**: At the same moment it shows "Used storage **117 MB / 58.2 GB**" —
-/// Both numbers match perfectly. This is the sole reason this type dares to be used.
-///
-/// ## The unit is **KB** (not bytes, not 512B sectors)
-/// If you don't multiply by 1024, total is only 61 MB, which differs from "58.2 GB" by three orders of magnitude and is easily recognizable.
-///
-/// ## Deliberately **unnamed** 4 bytes
-/// `[8..11]` on real device is always `0x00009C40` = 40000, and does not change with recording.
-/// It probably corresponds to the official `recSizePs`, but **no sample can prove what it is**
-/// (40000 is "reserved KB"? "cluster size"? "segment size"?), so we just call it `thirdField`
-/// — naming it would be misleading (consistent with the rule of `RecorderDeviceInfo`).
 struct TicNoteStorageInfo: Equatable {
 
     /// Total capacity (KB). Real device always `0x03A3E200`.

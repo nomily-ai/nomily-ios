@@ -48,10 +48,6 @@ enum AsrError: LocalizedError {
         case .azureRequiredForTranslation:
             return L10n.ASR.azureRequiredForTranslation
         case .http(let code, let body):
-            // ★ 2026-11-06（用户："自定义端点仍报 400"）：只贴一段原始 body 不够——
-            // 空 body 的 400（网关/代理/路由没通）看上去和"参数写错"一模一样，
-            // 用户只能反复猜。现在：body 原样保留（截断），空体明确写 empty body，
-            // 并按状态码给一句"下一步查哪里"。文案是诊断细节，保持英文与上面一致。
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
             let shown = trimmed.isEmpty ? "(empty body)" : String(trimmed.prefix(200))
             return "ASR provider returned HTTP \(code): \(shown)\(AsrError.httpHint(code))"

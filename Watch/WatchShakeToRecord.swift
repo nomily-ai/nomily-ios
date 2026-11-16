@@ -2,23 +2,6 @@ import CoreMotion
 import Foundation
 import SwiftUI
 
-/// ★ 2026-11-05（用户："停止录音跟结束录音震动效果也要多出几个"）：
-/// 录音起止的**震动花样**。力度（1–5 档）管"多重"，这里管"怎么响"——
-/// watchOS 只有固定触感，花样只能靠"哪种触感 + 几发 + 间隔"拼。
-///
-/// ★ 2026-11-05 第三轮（用户："震动样式里面分启动震动跟结束震动…启动震动一下结束震动
-/// 2 下，然后给不同的震动样式选择"）：**启动与结束各选各的花样**，不再共用一档——
-/// 默认启动 `.single`（一下）、结束 `.double`（两下），"一下=开录、两下=收工"的
-/// 语言保持不变，但两处都能换成下面任意一种。
-///
-/// | 花样 | 节奏 | 体感 |
-/// |---|---|---|
-/// | `.single` | 一段 ×1.0 | 默认的"开录"：就一下 |
-/// | `.double` | 两段长震，隔 1 s | 默认的"结束"：两下＝收工 |
-/// | `.triple` | 三段短震，隔 0.6 s | 三连敲，更急促 |
-/// | `.singleLong` | 一段超长震（×1.6） | 一下到底，最干脆 |
-/// | `.heartbeat` | 快快-停半秒-快快 | 心跳两拍 |
-/// | `.crescendo` | 轻→中→重 | 渐强收尾 |
 enum WatchHapticPattern: String, CaseIterable, Identifiable {
     case single
     case double
@@ -45,35 +28,11 @@ final class WatchRecordingPrefs: ObservableObject {
     /// the two gestures misfire in completely different scenarios (shake is "raise and lower the wrist", pinch is "wanting to press but missing"),
     /// and sharing one toggle would turn off one along with the other.
     private static let pinchKey = "watch.pinch_to_record.v1"
-    /// ★ 2026-11-02（用户："手表需要为全天候录音设置，这个功耗跟传输需要优化"）：
-    /// 全天候录音（省电模式）。开启后：
-    ///   · 电平采样 12.5Hz → 2Hz，波形重绘 30fps → 2fps（录音本身的麦克风/文件写入不动）；
-    ///   · 每段录音结束**不再立即回传**，攒在「待传」里——充电中、或关掉这个开关时自动补传，
-    ///     「同步」页的「立即同步」任何时候都能手动触发。
-    /// ⚠️ 默认**关**：它牺牲了实时性（波形变钝、回传延迟），是给"一戴一整天"的场景准备的，
-    ///    不该替所有用户做这个取舍。
     private static let allDayKey = "watch.all_day_recording.v1"
-    /// ★ 2026-11-05（用户："手表的震动还是太小了…震动大小分 5 个等级供用户选择"）：
-    /// 起止触感强度，1（最轻）–5（最重）。映射见 `WatchRecorderModel.playHaptics`。
-    /// 默认 **4**：就是"重触感长震"那一档——用户抱怨过默认太轻，出厂就给明显的。
     private static let hapticLevelKey = "watch.haptic_level.v1"
-    /// ★ 2026-11-05 第二轮（用户："停止录音跟结束录音震动效果也要多出几个"）：
-    /// 结束录音的**花样**（节奏），与力度档位独立——力度管"多重"，花样管"怎么响"。
-    /// 存在这里而不是模型里：它和"摇一摇开录"同级，是用户的偏好不是运行态。
     private static let stopHapticPatternKey = "watch.haptic_stop_pattern.v1"
-    /// ★ 2026-11-06（用户："手表这边可以增加一个表情常亮让手表持续显示在首页"）：
-    /// 常亮暗态下首页**显示表情**（true，默认）还是黑屏省电（false）。
-    /// watchOS 的常亮规则：App 在最前台的暗显时长由系统"返回表盘时间"决定
-    ///（默认 2 分钟，手表上可按 App 单独设到 1 小时/始终），代码无法覆盖——
-    /// 这个开关管的是"暗显的那段时间里画什么"，不是"多久回表盘"。
     private static let alwaysOnFaceKey = "watch.always_on_face.v1"
-    /// ★ 2026-11-05 第三轮（用户："震动样式里面分启动震动跟结束震动"）：
-    /// 启动录音的花样，与结束的花样**各存各的**——默认一下开、两下收，
-    /// 但两组都能换，用户可能就想要"开录也两下"这种对称感。
     private static let startHapticPatternKey = "watch.haptic_start_pattern.v1"
-    // ★ 2026-11-06 二轮（用户："瞳孔跟随手指…不操作打瞌睡…眼睛形状也加入…手机设置里多一些"）：
-    // 表情"活起来"这一组的四个偏好，全部由手机端 Apple Watch 设置页推送 +
-    // 手表设置页只读跟随（同一语义：翻开关的那端说了算）。
     private static let eyeShapeKey = "watch.eye_shape.v1"
     private static let drowsyEnabledKey = "watch.drowsy.v1"
     private static let drowsyAfterKey = "watch.drowsy_after.v1"

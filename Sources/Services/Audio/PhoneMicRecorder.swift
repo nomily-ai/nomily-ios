@@ -4,23 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "phone-mic")
 
-/// Phone-microphone recorder feeding both a WAV file and live ASR (★ 2026-10-22, 任务一).
-///
-/// ## Why this exists
-/// Nomily's live pipeline used to be device-only (`LiveAudioSource` is built
-/// around Opus packets from a card). "Phone recording with live captions"
-/// (Plaud's `record` module) has no Opus encoder available — libopus is not
-/// linked — so this source skips the Opus detour entirely: the mic's PCM is
-/// written straight to a **WAV** file (universally playable, `PostDownload`
-/// already passes `.wav` through) and fed as 16 kHz mono Int16 PCM to a live
-/// ASR engine (`LiveCaptionController`).
-///
-/// ## Threading
-/// The AVAudioEngine tap fires on a realtime audio thread. Nothing heavy may
-/// run there: the tap converts and hands the PCM to a serial work queue that
-/// does file IO and level math; `@Published` state is funnelled to the main
-/// actor with a cheap throttle. Consumers (`LiveCaptionController`) receive
-/// `append` calls on the main actor, matching what `PlaudLiveASR` expects.
 @MainActor
 final class PhoneMicRecorder: ObservableObject {
 

@@ -43,22 +43,10 @@ struct RootView: View {
     /// ★ 2026-11-06（后台保活·被杀善后）：冷启动读到 `keeper.jobsActiveAtBackground.v1`
     /// 还是 true = 上次在后台时进程是被杀掉的（正常回前台会先清掉），弹一条一次性提示。
     @State private var interruptedLastRun = false
-    /// ★ 2026-11-06（用户："有些权限被关闭，需要弹窗提醒，例如蓝牙没开"）：
-    /// 当前正在弹的权限问题（一次只弹一条，按 麦克风 > 蓝牙权限 > 蓝牙开关 > 通知 排序）。
     @State private var permissionIssue: PermissionIssue?
-    /// ★ 2026-11-02（用户："使用引导需要到对应的 app 的功能模块去，在对应模块指向
-    /// 让用户点击"）：流程式引导取代整页 onboarding——卡片浮在真实页面上，5 步
-    /// 走完 录音页→实时→ASR→LLM→WebDAV。进度落 UserDefaults；设置 → 使用引导
-    /// 可重置重走。
     @AppStorage("guide.done.v1") private var guideDone = false
     @AppStorage("guide.step.v1") private var guideStepRaw = GuideStep.connectDevice.rawValue
-    /// ★ 2026-11-02（用户："首次用户使用需要弹出用户引导"）：首启欢迎页的「看过了」位。
-    /// 与 `guide.done.v1` 分开记：欢迎页只弹一次，之后重看流程引导（设置 → 使用引导）
-    /// 不该再把欢迎页顶出来。
     @AppStorage("welcome.seen.v1") private var welcomeSeen = false
-    /// ★ 2026-11-03（用户："是否需要在增加一个免责条款，让用户同意点击之类的"）：
-    /// 首启的免责声明是否已同意。**和欢迎页共用一个 cover**（见下面的 `fullScreenCover`），
-    /// 两个 cover 串着弹会撞上 SwiftUI 的 presenting-while-presenting 警告。
     @AppStorage(NomilyConsent.storageKey) private var consentAccepted = false
     /// 主按钮（扫描/深链）刚导航过 → 推进时不切 tab（避免边扫描边跳页）。
     @State private var guidePrimaryNavigated = false
@@ -398,9 +386,6 @@ struct RootView: View {
         } message: {
             Text(L10n.ASR.killedAlertBody)
         }
-        // ★ 2026-11-06（用户："有些权限被关闭，需要弹窗提醒，例如蓝牙没开"）：
-        // 每次回到前台 + 蓝牙状态每次变化都查一遍；**每个问题只在关闭状态下提醒一次**
-        //（用户点掉后不再弹，直到权限恢复过再关才重新提醒），避免每次冷启动都骚扰。
         .alert(item: $permissionIssue) { issue in
             Alert(
                 title: Text(L10n.ASR.permAlertTitle),
@@ -615,8 +600,6 @@ struct RootView: View {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 checkPermissionIssues()
             }
-            // ★ 2026-10-29 (饭耳移植 · 规格 §3.1): catch a timed-recording window
-            // that began while the app sat in the task switcher.
             TimedRecordingScheduler.shared.evaluate()
             // A toast that finished queuing in the background must not pop up
             // minutes after unlock — drop anything past its shelf life.
@@ -629,14 +612,7 @@ struct RootView: View {
             // Nothing to keep alive while suspended; the next foreground start
             // reconnects anyway.
             plaudDirect.stopConnectionKeeper()
-            // ★ 2026-10-29 (饭耳移植): re-arm tonight's backlog window every time
-            // we leave the foreground — the freshest submit wins, and each one
-            // carries the newest config (switch state) implicitly via execution.
             NightlyTranscribeScheduler.shared.schedule()
-            // ★ 2026-11-06（用户："加入后台常驻防止被杀后台…不行则增加用户引导跟
-            // 通知栏检测"）：静音音频保活已是 iOS 的上限（没有常驻 API），所以按
-            // "不行"的那条走——手里还有任务时架起**被杀预警哨兵**：进程活着通知
-            // 永远不响，被杀后 60 秒内用户必收到一条"任务被中断"。
             BackgroundKeeper.shared.armKillGuard()
         }
     }

@@ -1,42 +1,5 @@
 import Foundation
 
-// MARK: - Application layer of TicNote Wi-Fi fast transfer (pure logic, no dependency on Network / CoreBluetooth)
-//
-// ## Sources of evidence
-// All from `ticnote-re/decompiled/classes6/sources/com/mobvoi/wifi_plugin/`:
-//   · `socket/WifiProtocol.java`   —— port and cmder constant table
-//   · `socket/WifiDataVo.java`     —— **byte-level frame layout (this file's implementation follows it line by line)**
-//   · `WifiPlugin.java`            —— JSON field names of each cmder and where they are actually built
-//   · `socket/ConnectWifiUtils.java` —— how the phone joins the AP
-// Cross-checked against the Dart-side log strings (`blutter_out/pp.txt`):
-//   `" Start opening WebSocket: port=8081, uuid="` / `"token"` / `"1234567890000000"` / `"old"`
-//
-// ## ⛔ The direction call in round 7 was wrong; corrected here
-// `protocol-notes.md` §0quinquies said "card-side server (the one we connect to)" ——
-// **that is backwards**. The real direction:
-//
-//   ```
-//   Phone = WebSocket **server** (WifiPlugin.openSocket → org.java_websocket.server.WebSocketServer)
-//   Card = WebSocket **client** (connects in, sends cmder=2 SAY_HELLO first)
-//   ```
-//
-// Three consistent pieces of evidence:
-//   1. `WifiPlugin.openSocket` uses `WebSocketServer` + `new InetSocketAddress(port)` + `start()`;
-//      `sendDataToWifi` sends to `socketListener.getClientConn()` (**the connection the server accepted**).
-//   2. `closeDevice` logs `"---client closeSocket ---"` and checks `getClientConn() == null`
-//      → only "not connected" when no client has connected in.
-//   3. On `cmder == 2`, `WifiPlugin`'s `onMessage` prints **`"received devices request hand!"`**
-//      ("device requests handshake") and replies with `cmder = 1`. The device = the card.
-//
-// This correction is not wordplay; it decides what the iOS side must do:
-// **iOS must start a listener itself** (Foundation only has a client, so the handshake / framing must be written by hand,
-//   see `Sources/Services/Net/WebSocketFraming.swift`), rather than "connecting to the card's 8081".
-//
-// ## Another correction: the card is the AP, the phone is the joiner
-// `ConnectWifiUtils.connectWifi` goes through `addNetwork` / `WifiNetworkSpecifier` /
-// `WifiNetworkSuggestion` —— all of which **join** a network. So the SSID / password belong to **the card's hotspot**,
-// and are delivered by the card over BLE (`WifiStatusEvent`). The §0quinquies note that "host must be an empty string, waiting for the BLE override"
-// is still right, but should be read as "the empty string is because that is **someone else's** address, and the direction is card connecting to us".
 
 // MARK: - cmder table
 
@@ -77,29 +40,6 @@ enum TicNoteWifiCmder {
     /// Phone → card: OTA data chunk (`{"offset","length"}` + bin)
     static let otaData: UInt16 = 18
 
-    // ── ★★★ V2 (19 / 20): the official App **never calls it even once**, and the card explicitly rejects it on real hardware ────
-    //
-    // 2026-10-12 conclusion from both sides (real device + Dart reverse-engineering cross-check), **changed the main flow**:
-    //
-    // [Real device] The first request we sent after a successful fast-transfer handshake was cmder 20, and the card sent back two frames:
-    //   `← cmder=1 {"status":0}` (handshake accepted) +
-    //   `← cmder=0 {"cmd":20,"code":3}` (**explicitly rejects cmd 20**).
-    //   After that, 11 heartbeats were still sent and the list got no reply in 30 s. The 4 attempts had exactly the same shape
-    //   (20:35:36 / 20:36:23 / 20:38:26 / 09:37:08).
-    //
-    // [Dart] In the official App snapshot, both entry points go through V1:
-    //   · `wifi_logic.dart::_handShakeReturn`(0x107b66c)  → `WifiPlugin::getFileList` (cmder 11)
-    //   · `recording_logic.dart::handShakeReturn`(0x1045764) → the same `getFileList`
-    //   · `wifi_logic.dart::_downloadFile`(0x1043b7c)     → `WifiPlugin::downFileList` (cmder 12)
-    //   while the **method names** `getFileListV2` / `downFileListV2` **never appear even once
-    //   in the entire Dart snapshot** —— V2 is only registered on the Java side, and this build of the App never reaches it.
-    //   The log literal in recording_logic states the intent plainly:
-    //   `"🤝 WiFi fast transfer unified to legacy path, sending getFileList request: "` ("unified to the legacy path").
-    //
-    // So the main flow now uses **V1 (11 / 12)**. The two constants below are kept for two reasons only:
-    // ① if some future firmware drops V1, there is a named place to land;
-    // ② when 19 / 20 show up in logs / packet captures they can be recognised.
-    /// Phone → card: start download (V2, one more `fileType` than 12)
     static let downFileListV2: UInt16 = 19
     /// Phone → card: fetch file list (V2)
     static let getFileListV2: UInt16 = 20
@@ -332,10 +272,6 @@ enum TicNoteWifiJSON {
     }
 }
 
-// MARK: - Outbound: frame builders
-//
-// Each one can be pointed to a specific line in `WifiPlugin.java`. The line numbers in the comments are those of the decompiled output,
-// so the next person can jump straight to the original without searching again.
 
 enum TicNoteWifiOutbound {
 
@@ -431,12 +367,6 @@ enum TicNoteWifiOutbound {
         )
     }
 
-    /// Stop sync.
-    ///
-    /// ⚠️ **Inferred value**: `WifiProtocol.WifiRequest.FILE_SYNC_STOP = 15` is definite,
-    /// but `WifiPlugin` has **no place that builds 15** (the Dart side should go through another method-channel branch,
-    /// which was not left in the decompiled output). So the payload field names are inferred from the shape of `fileDelete`,
-    /// marked as not measured —— used only on the "user tapped cancel" path where resuming is not intended.
     static func fileSyncStop(session: Int64, scene: Int64) -> TicNoteWifiFrame {
         TicNoteWifiFrame(
             cmder: TicNoteWifiCmder.fileSyncStop,
@@ -603,12 +533,6 @@ struct TicNoteWifiUniversalError: Equatable {
     var description: String { "card refused cmd \(cmd) (code \(code))" }
 }
 
-/// Content chunk of `cmder == 13`. `json` may carry an offset, and `bin` is the data itself.
-///
-/// The official code writes to disk by **appending in order** (`FileOutputStream(path, true)` + `getChannel().size()`),
-/// and the completion criterion is `bytes written >= fileSize` (the branch `if (r12 >= r3.longValue())`
-/// decompiled from `saveFileData`). So whether there is an offset is actually optional:
-/// if there is, place by offset (gaps can be detected); if not, append in order.
 struct TicNoteWifiContentChunk {
     let json: String?
     let offset: Int?

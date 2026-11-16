@@ -4,36 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "backlog")
 
-/// ★ 2026-10-29（饭耳移植 · BGTaskScheduler 夜间积压转写）
-///
-/// The night-shift worker: while the phone sits charging on the nightstand, iOS
-/// grants a `BGProcessingTask` window, and this class uses it to drain the
-/// recordings that never got a transcript — the backlog from clips that arrived
-/// while no cloud key was configured, or while the app was killed mid-queue.
-///
-/// Why a BGTask at all (and not just `resumePending`): the existing resume path
-/// only runs **while the process is alive** — launch or foreground return. If
-/// the user transfers clips at 9pm and never opens the app again, nothing
-/// touches them until tomorrow's launch. The BGTask window is the one moment
-/// iOS *invites* us to run without a user in the room, and "charging + night"
-/// is exactly when running a batch of uploads is least intrusive.
-///
-/// Division of labour (deliberate, do not merge):
-///   · **Discovery** (here): scan `decryptedDir` for audio without a `.txt`
-///     sibling and hand each one to `TranscriptionService.enqueue` — the queue
-///     is the single source of truth for "what still needs work".
-///   · **Execution** (`TranscriptionService`): the existing 600-line pipeline,
-///     retries and persistence untouched. The BGTask never transcribes
-///     anything itself; it only feeds the queue and holds the process open
-///     for the drain loop that already exists.
-///
-/// Wiring (three points, matching Apple's lifecycle):
-///   1. `register()` — from `NomilyApp.init`, i.e. before the launch finishes.
-///      BGTaskScheduler refuses registration any later.
-///   2. `configure(transcription:configService:)` — from `AppEnvironment.init`,
-///      which owns the services the handler needs.
-///   3. `schedule()` — from scenePhase `.background` and from launch, so the
-///      request is always the *next* night, not a one-shot.
 @MainActor
 final class NightlyTranscribeScheduler {
 

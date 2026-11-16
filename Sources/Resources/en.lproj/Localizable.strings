@@ -1559,6 +1559,8 @@
 "summarize.mine_space_footer" = "Language and model are saved as your defaults.";
 "webdav.title" = "WebDAV backup";
 "webdav.credential_guide" = "The username & password here are WebDAV service credentials: on Synology/QNAP/UGREEN/fnOS they are the same as your NAS account (after WebDAV is enabled); for Nutstore and Nextcloud you MUST create an app password in their web settings — the login password gets rejected.";
+"webdav.nextcloud_path_hint" = "The default path is /remote.php/dav/files/your-username/Nomily/. You can choose any existing folder on the server.";
+"webdav.pasted_share_link" = "This is a web sharing link, not a WebDAV address. Enter only the host name (for example, example.com), your account name, and an app password. The folder is created automatically.";
 "webdav.setup_footer" = "Pick your server type, then fill in the address and account. A wrong folder is fine — Test connection auto-locates the ZSpace personal space.";
 
 "webdav.preset" = "Server";
@@ -1944,10 +1946,7 @@
 "settings.buy_banner_title" = "Vobot V05E Recorder Card";
 "settings.buy_banner_subtitle" = "The recorder card that fits Nomily best — on Amazon";
 
-/* ★ 2026-11-05：全局英文界面去中文残留（用户："设置在英文界面下为啥还有中文显示，
-   这是 ASR 的这块，其他的也都要检查一下"）。三类：① 不带 value: 的键（tab.nomily
-   之前在英文界面直接显示 key 原文）；② value: 是中文的键（回落值就是中文）；
-   ③ ASR 模型名 / 凭据字段——原始值是发给 API 的真名，翻译只作用于显示层。 */
+/* English fallback values. */
 "tab.nomily" = "Nomily";
 
 /* 定时录音 → 手表 */

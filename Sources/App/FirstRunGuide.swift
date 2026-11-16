@@ -1,19 +1,5 @@
 import SwiftUI
 
-/// ★ 2026-11-02（用户："使用引导需要到对应的 app 的功能模块去，是在对应的模块点击，
-/// 不要一整个页面，而是在对应模块指向让用户点击，走一遍流程"）：
-///
-/// 流程式首用引导：**卡片浮在真实页面上**，按 5 步带用户走完核心链路——
-///
-/// 0. 录音页：连接设备（主按钮直接拉起扫描）
-/// 1. 实时页：实时转写是什么
-/// 2. 设置 → ASR 服务商（深链直达，页内就有「去控制台获取 API Key」）
-/// 3. 设置 → LLM 服务商（深链直达）
-/// 4. 设置 → 录音与转写（WebDAV 备份入口）
-///
-/// 进度存 UserDefaults（`guide.done.v1` + `guide.step.v1`）：首次启动自动开始，
-/// 设置 → 使用引导 可随时重看。卡片由 RootView 挂 overlay（浮在所有被推入的
-/// 页面之上），深链的入栈/出栈由 RootView 的 action 闭包驱动。
 enum GuideStep: Int, CaseIterable {
     case connectDevice = 0
     case liveTranscribe

@@ -3,28 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "live-caption")
 
-/// Live captions for the **phone microphone** recording (★ 2026-10-22, 任务一).
-///
-/// ## What it borrows
-/// The PCM engine abstraction built for the PLAUD card (`PlaudLiveASR`) is
-/// source-agnostic: `PlaudAzureLiveTranscriber` takes 16 kHz mono PCM over the
-/// Azure Speech WebSocket (with the turn-end protocol handled), and
-/// `PlaudLiveTranscriber` is the on-device Apple Speech fallback. This
-/// controller wires the phone mic's PCM into the same engine chain, so the
-/// provider selection, fallback seeding and clock formatting all behave
-/// exactly like the card's live transcript.
-///
-/// ## Degradation ladder (任务一 requirement 3)
-/// 1. Chain pick: user's `defaults.asr` (Azure-capable only — PCM), then
-///    on-device.
-/// 2. Azure dies mid-take → fall back to on-device and **seed** the text that
-///    is already on screen (nothing the user read disappears).
-/// 3. Nothing at all (no permission / no model / no Azure) → honest notice,
-///    recording keeps going. A recording must never depend on ASR.
-///
-/// ## Telemetry (任务一 requirement 4)
-/// `record_live_caption_show` on the first final line, `record_live_caption_fail`
-/// when every engine is unavailable.
 @MainActor
 final class LiveCaptionController: ObservableObject {
 

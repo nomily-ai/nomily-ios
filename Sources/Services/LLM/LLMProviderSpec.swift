@@ -62,11 +62,6 @@ struct LLMProviderSpec: Identifiable, Equatable {
     /// Provider-specific caveat.
     let note: String?
 
-    /// ★ 2026-11-05（用户："给大语言模型的介绍里设置一个花费情况…中文展示人民币，
-    /// 英文展示 USD"）：这家厂商**摘要一小时录音**的大概 API 花费。粗口径——
-    /// 一小时转写约 1 万字符（3–8k tokens 入，1–2k 出），按各家主力模型牌价估的
-    /// 区间；ollama 本地运行就是 0。`nil` = 没有可估计的口径（custom）。
-    /// 显示时走 `localizedCost`（键 `llm.<id>.cost`），英文表给美元版。
     var costNote: String? = nil
 
     /// Tile colour, as components so this file stays free of SwiftUI.
@@ -105,8 +100,6 @@ struct LLMProviderSpec: Identifiable, Equatable {
         case "qwen":       return "BrandQwen"
         case "deepseek":   return "BrandDeepSeek"
         case "doubao":     return "BrandDoubao"
-        // ★ 2026-11-02（用户："模型都要按照当前 Apple store 的 app 图标来"）：
-        // Kimi / 智谱 / MiniMax 补上官方 App 图标资产。
         case "kimi":       return "BrandKimi"
         case "zhipu":      return "BrandZhipu"
         case "minimax":    return "BrandMinimax"
@@ -114,10 +107,6 @@ struct LLMProviderSpec: Identifiable, Equatable {
         }
     }
 
-    /// ★ 2026-11-02（用户："模型图标要按照 Apple Store 的 app 图标，不要简约的"）：
-    /// 这批厂商的 `brandAsset` 已经换成 **App Store 官方 App 图标的彩色位图**
-    /// （iTunes Search API 抓的 artwork，渲染时不能再套 template/白色）。
-    /// 没有消费级 App 的厂商（openRouter / ollama / custom）仍走单色瓦片。
     var usesAppStoreIcon: Bool {
         switch id {
         case "openai", "claude", "gemini", "deepseek", "doubao",
@@ -163,7 +152,6 @@ struct LLMProviderSpec: Identifiable, Equatable {
 
     static func find(_ id: String) -> LLMProviderSpec? { all.first { $0.id == id } }
 
-    // MARK: Localized display strings（★ 2026-11-02，用户："好多中文的都没翻译过来"）
 
     /// 英文 UI 从 en.lproj 读 `llm.<id>.*` 键，缺失时回落到这里的值。
     /// console 多为拉丁字符 URL，只有 note 需要真正翻译。
@@ -271,9 +259,6 @@ struct LLMProviderSpec: Identifiable, Equatable {
         keyRequired: false,
         curatedModels: [],
         console: nil,
-        // ★ 2026-11-04（用户："当前自定义的需要支持这种不只是 openai 的"）：
-        // 原来只写"OpenAI 兼容的 /v1 地址"，而实际拿到手的中转/专属端点常常已经带了
-        // 版本段（…/compatible-mode/v1），甚至只提供 Anthropic 格式——两种现在都能选。
         note: "任何 OpenAI 兼容或 Anthropic 兼容的地址（中转、自建 vLLM、LM Studio、云厂商专属端点都算）。地址可带版本号，也可只填域名。密钥可以留空。"
     )
 

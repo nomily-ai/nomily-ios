@@ -44,8 +44,6 @@ struct WatchRecapView: View {
                         } label: {
                             row(recap)
                         }
-                        // ★ 2026-10-30（用户："删除的时候不是全部删除摘要，点击删除
-                        // 支持选择删除哪条摘要"）：左滑删**这一条**，不再只能清空全部。
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 withAnimation { store.remove(id: recap.id) }
@@ -142,8 +140,6 @@ struct WatchRecapDetailView: View {
                     }
                 }
 
-                // ★ 2026-10-30（用户："在里面可以查看到待办，支持在手表里面点击可以
-                // 同步到手机的待办里面"）：点一条 → 手机写进「提醒事项」。
                 if !recap.todos.isEmpty {
                     Text(L10n.Watch.recapTodos)
                         .font(.system(size: 10, weight: .medium))

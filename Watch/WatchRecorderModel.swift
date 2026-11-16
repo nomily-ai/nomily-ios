@@ -53,17 +53,8 @@ final class WatchRecorderModel: NSObject, ObservableObject {
     @Published private(set) var meter = WatchAudioMeter()
     @Published private(set) var pending: [PendingClip] = []
     @Published var errorMessage: String?
-    /// ★ 2026-10-30（用户："录音断联需要状态弹出提醒告知，点击或者在附近就重连"）：
-    /// 录音期间与手机断联的提醒状态。`true` 时录音界面弹 alert，
-    /// 「重连」按钮走 `reconnectNow()`；手机回到附近（可达性恢复）自动清除并补发。
     @Published private(set) var linkLost = false
 
-    /// ★ 2026-11-03 八轮（用户："有些需要标记重点的，能否在手表下方按一下就打点"）：
-    /// 这一段录音里已经被打点的时间点（秒，相对录音开头）。
-    ///
-    /// ⚠️ 单位是 `elapsed` 而不是绝对时间：录音可以暂停/被系统打断（那时 `currentTime`
-    ///    冻结），用绝对时钟算出来的点会跑到音频的后面去。`elapsed` 就是音频自己的
-    ///    时间轴，与转写/摘要能对齐。
     @Published private(set) var marks: [TimeInterval] = []
 
     /// 整场录音已经打过多少个点（跨分段累加）。
@@ -136,19 +127,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
     /// out of the 12.5Hz tick.
     private static let meterTicksPerSecond = 12
 
-    // ★ 2026-11-02（用户："手表需要为全天候录音设置，这个功耗跟传输需要优化"）：
-    // 「全天候录音」= 省电模式。录音本体（麦克风 + 文件写入）一根毫毛都不动，
-    // 动的只有"给人看的部分"和"回传的时机"：
-    //
-    // | 项 | 常规 | 省电 |
-    // |---|---|---|
-    // | 电平采样 | 12.5Hz | 2Hz（0.5s 一次；波形变钝，但每小时的定时器唤醒从 ~45,000 降到 ~7,200） |
-    // | 波形重绘 | 30fps | 2fps（见 `WatchVoiceWave.lowPower`） |
-    // | 回传时机 | 每段录音结束立即发 | **攒着**：充电中、或关掉开关时自动补传；「立即同步」随时可用 |
-    //
-    // ⚠️ 为什么回传是功耗大头：每段结束就发一次 WCSession 文件传输会唤醒双方射频；
-    //   全天候场景下录音是几十段地攒，攒一批一起发比逐段发省得多——
-    //   而且塞在充电时发，电池曲线根本看不出来。
     private static let meterIntervalSaver: TimeInterval = 0.5
     private static let meterTicksPerSecondSaver = 2
 
@@ -204,39 +182,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
     /// Digital Crown uses.
     private static let confirmation: WKHapticType = .click
 
-    /// 起止触感：**开始时一声 1 秒长震；结束时两段 1 秒长震、中间隔 1 秒**
-    /// （2026-11-04 第二轮，用户："需要长震动震动大的，震动一下的启动录音需要震动 1s，
-    /// 震动 2 下…停止录音"）。
-    ///
-    /// ## 为什么是"连发"而不是换一种触感
-    /// watchOS **没有 Core Haptics**（这是 iOS 才有的框架），`WKHapticType` 全是系统定长的
-    /// 固定花样：`.click` 最短、`.notification` 是两下轻敲，**没有任何一种是"持续 1 秒"的**。
-    /// 想让手腕真的麻一下，只能拿重触感当鼓点连发——每 `pulseInterval` 一发，
-    /// 串成一段连续的震感。间隔再密系统会丢包，反而变成断开的几下。
-    ///
-    /// ## 节奏
-    /// * 开始 = 1 段（1.0 s）→ 干脆的一下；
-    /// * 结束 = 2 段（1.0 s + 1.0 s 间隔 + 1.0 s）→ 明显是"两下"，与开始区分得开。
-    /// 间隔想改长/改短，只动 `pulseGap`；每段长短动 `pulseSeconds`。
-    ///
-    /// 🔁 同一时间只留一条队列：手快的人"停—立刻又开"时，上一段没放完的震动会盖在
-    ///    开录那一下上，听着像乱震。
-    /// ★ 2026-11-05 第二轮（用户："需要达到类似其他的 app 的最大震动，当前这个
-    /// 震动太小没任何反馈"）：`.click` 是 Digital Crown 那种轻点，是全表**最轻**的
-    /// 触感，连发出来也只是细密的麻——用户感觉"没任何反馈"。换成 `.failure`
-    /// （heavy double knock，Apple 全部触感里最重的一档），连发间隔放宽到
-    /// 140 ms：重触感本身更长，再密系统就会丢包。
-    ///
-    /// ★ 2026-11-05 第三轮（用户："震动大小分 5 个等级供用户选择"）：触感类型与
-    /// 单段时长随 `WatchRecordingPrefs.hapticLevel` 走（设置页可调）：
-    ///
-    /// | 级 | 触感 | 单段 | 体感 |
-    /// |---|---|---|---|
-    /// | 1 | `.click` | 0.3s | 轻点一下（原来那副"没反馈"的样子） |
-    /// | 2 | `.notification` | 0.5s | 两下轻敲 |
-    /// | 3 | `.failure` | 0.7s | 重敲但短 |
-    /// | 4 | `.failure` | 1.0s | 重长震（默认，原"最大震动"档） |
-    /// | 5 | `.failure` | 1.4s | 最长最密（间隔收窄到 0.13s） |
     private static let pulseInterval: TimeInterval = 0.14
     private static let pulseGap: TimeInterval = 1.0
 
@@ -268,27 +213,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         }
     }
 
-    // MARK: ★ 2026-11-05 第二轮（用户："停止录音跟结束录音震动效果也要多出几个"）
-    //
-    // 起止录音的**花样**。watchOS 没有 Core Haptics，`WKHapticType` 只有固定几种且都是定长，
-    // 所以"花样"只能靠「触感类型 + 连发几段 + 段间隔 + 每段长短」拼出来。力度（1–5 档）
-    // 决定单段的基准长度与类型，花样在此基础上做缩放：
-    //
-    // ★ 第三轮（用户："震动样式里面分启动震动跟结束震动…启动震动一下结束震动 2 下，
-    //   然后给不同的震动样式选择"）：启动与结束**各选各的**（`startPattern` / `stopPattern`），
-    //   默认一下开、两下收——"一下=开录、两下=收工"的暗号保持不变。
-    //
-    // | 花样 | 段数 × 时长系数 | 段间隔 | 体感 |
-    // |---|---|---|---|
-    // | `.single` | 1 × 1.0 | — | 默认的开录：就一下 |
-    // | `.double` | 2 × 1.0 | 1.00 s | 默认的结束：两下＝收工（老用户无感） |
-    // | `.triple` | 3 × 0.6 | 0.55 s | 三连短敲，更急促、更"确认" |
-    // | `.singleLong` | 1 × 1.6 | — | 一下到底的长嗡，最干脆 |
-    // | `.heartbeat` | 4 段：0.45 / 0.45 / 0.55 / 0.55 | 0.18 / 0.85 / 0.18 | 心跳两拍（快快-停-快快） |
-    // | `.crescendo` | 3 段：0.5 / 1.0 / 1.7 | 0.35 / 0.35 | 轻→中→重，渐强收尾 |
-    //
-    // ⚠️ 段间隔不能靠"缩短单段"实现：`device.play` 是异步排队的，同一时刻只能有一段在震，
-    //    真正的"停"必须由 `Task.sleep` 撑出来，所以下面用 (段时长, 段后停顿) 的序列描述花样。
 
     /// 一段触感：`seconds` 是这一段的时长（会换算成 tick 数），`gap` 是这段**播完之后**的停顿。
     private typealias HapticBeat = (seconds: TimeInterval, gap: TimeInterval)
@@ -427,20 +351,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         isRecording ? stopByUser() : requestPermissionAndStart()
     }
 
-    /// ★ 2026-11-05 第四轮（用户："点击了全天候录音的开关则需要自动就开启了录音，
-    /// 不要手动去点击"）：全天候开关被翻开的瞬间自动开录。
-    ///
-    /// 调用点（两条路都收口到这里）：
-    /// ① 手表设置页翻开关（`WatchSettingsView` 的 onChange）；
-    /// ② 手机端翻开关经 WatchConnectivity 推过来（`NomilyWatchApp` 的 `onAllDaySetting`）。
-    ///
-    /// 幂等：已在录、或上一场开录还卡在重试梯子里（`startAttempt > 0` /
-    /// `startRetryTask` 挂着）都不再起第二场——多个入口几乎同时触发时只会开一次。
-    ///
-    /// ★ 2026-11-06（全天候语义）：第四轮注释里"反方向不自动停，用户手动按停
-    /// 全天候开着也尊重"已废弃——用户拍板的新语义是**全天候开着就不存在不录音
-    /// 这么一说**：`stop()` 末尾检测开关还开着就回到这里续一场；用户想停只有
-    /// 关开关一条路（`stopByUser()`，表上设置页 / 手机端同理）。
     func autoStartForAllDayIfNeeded() {
         guard WatchRecordingPrefs.shared.allDayRecording,
               !isRecording, startAttempt == 0, startRetryTask == nil else { return }
@@ -469,10 +379,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - remote timed recording (phone → watch, ★ 2026-10-30)
-    //
-    // 用户："定时录音……真正在手表上录"。手机在配置窗口内通过
-    // WatchConnectivity 让手表开录/停录，手表只是执行者。
 
     /// 最近一次 "start" 命令是否还没落实成录音（后台送达/权限未决时为 true，
     /// `WatchLink.retryUnconfirmedTimedCommand` 据此决定要不要补执行）。
@@ -508,29 +414,10 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         remoteStopTask = nil
     }
 
-    // MARK: - link-lost alert (★ 2026-10-30)
-    //
-    // 用户："手表如何在录音断联，需要状态弹出提醒告知，点击或者在附近就重连。"
-    //
-    // ## 为什么有防抖
-    // `isReachable` 要求手机 App 在前台（见 `WatchLink.phoneReachable` 的注释），
-    // 手机锁屏/切走就会瞬间置 false——没有防抖的话，录音 30 秒后手机一锁屏
-    // 手表就弹窗，全是狼来了。所以：掉线要**持续** `reachabilityGrace` 秒才
-    // 认定真断联；恢复则立刻清除并自动重连（补推状态 + 补发队列）。
-    //
-    // ## 代价与兜底
-    // 断联本身不伤录音（文件在表上写盘，传输走后台队列），提醒只解决
-    // 「用户以为传过去了其实没传」的信息差。点「重连」立即重推状态并
-    // 重发队列；哪怕不点，回到附近也会自动补上。
 
     /// 掉线持续这么久才算真断联（锁屏/切走的瞬时 false 不算）。
     private static let reachabilityGrace: TimeInterval = 20
 
-    /// 断联后每隔这么久自愈一次：重激活会话 + 重推状态。
-    ///
-    /// ★ 2026-11-03（用户："点击自动重连或者不点击也可以，增加重连机制"）：
-    /// 「不点也重连」不能只靠"等手机自己回来"——会话被系统拆掉时它永远不回来。
-    /// 这个节拍器就是那条兜底：App 还活着就每 30 秒试一次，恢复可达立刻停。
     private static let reconnectRetryInterval: TimeInterval = 30
 
     private var reachabilityDebounce: Task<Void, Never>?
@@ -872,15 +759,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         log.info("saved \(self.marks.count, privacy: .public) mark(s) for \(url.lastPathComponent, privacy: .public)")
     }
 
-    /// ★ 2026-10-20: no longer `private` — the hold-to-stop path in `WatchRecorderView`
-    /// ends the take directly (a deliberate 2-second hold needs no extra confirmation,
-    /// unlike tap / double-tap / shake, which are all misfire-prone).
-    ///
-    /// ★ 2026-11-06（全天候语义，用户："全天候录音打开的就不存在说不录音这么一说…
-    /// 也没暂停一说，那个暂停应该是关闭全天候录音这个开关了就是"）：全天候开着时，
-    /// 走到这里的停止（系统打断放弃、看门狗放弃、远程/定时命令）都不算"录音结束"
-    /// ——收口后立刻再起一场，中间丢的只有换文件那几十毫秒。真正能停的只有一条
-    /// 路：把全天候开关关掉（那时 `allDayRecording` 已是 false，这里自然不重启）。
     func stop() {
         guard let recorder else { return }
         let url = recorder.url
@@ -978,12 +856,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
             } catch {
                 log.error("session re-activate after interruption failed: \(error.localizedDescription, privacy: .public)")
             }
-            // ★ 2026-11-02（用户："我没有结束录音就自己关闭了"）：不再以
-            // `.shouldResume` 为开关——watchOS 在大量真实场景（Siri、计时器、
-            // 通知、后台打断）下**根本不下发**这个标志位，旧逻辑因此直接停录。
-            // 现在改为：立即试续录 → 失败则 0.5s/1.5s/3s 三次重试 → 全部被拒
-            // 才优雅停（已录部分照常落盘上传）。`record()` 在暂停的 recorder
-            // 上是向同一文件续写，不会开新文件。
             if let recorder, recorder.record() {
                 log.info("recording resumed after interruption (immediate)")
             } else {

@@ -2,18 +2,6 @@ import EventKit
 import Foundation
 import os.log
 
-/// ★ 2026-10-29（用户："待办支持同步到 iPhone 里面的待办，需要打开这个开关"）：
-/// 把录音摘要里的待办行写进系统「提醒事项」App（EventKit Reminders）。
-///
-/// 设计要点：
-/// · **幂等**——每条录音维护一份「待办文本 → calendarItemIdentifier」映射
-///   （UserDefaults），文本没变过的行绝不重复创建；摘要重新生成后新增的行
-///   会补建，被删掉的行**不会**去删用户提醒事项里的条目（删用户的提醒越权了，
-///   页脚里说明这一点）。
-/// · **勾选双向走单向镜像**——App 内勾选/取消勾选会把对应提醒的 `isCompleted`
-///   同步过去；提醒事项 App 里打的勾不会回流（那是用户的私人清单，App 不去抢）。
-/// · 权限：iOS 17+ 走 `requestFullAccessToReminders`，iOS 16 走老的
-///   `requestAccess(to: .reminder)`；Info.plist 两条 usage description 都要。
 final class RemindersSyncService {
     static let shared = RemindersSyncService()
 

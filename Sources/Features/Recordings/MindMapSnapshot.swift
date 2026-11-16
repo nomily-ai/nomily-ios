@@ -1,18 +1,6 @@
 import Foundation
 import UIKit
 
-/// 把一条录音的摘要渲染成思维导图 PNG（给 WebDAV 备份用）。
-///
-/// ★ 2026-11-04（用户："思维导图直接就是生成的图"）：服务器上放一张图，比放一份
-/// 大纲 JSON 有用得多——手机、网页、群晖的文件管理器都能直接看。
-///
-/// 这条管线必须和屏幕上看到的**完全一致**，否则备份出来的图和 App 里的不是同一张：
-/// `MarkdownOutline.parse → MindMapTemplate.detect/apply → fold → MindMapLayout.build
-/// → MindMapExporter.image`，一步不少。折叠层级取"能显示三层"，也就是用户第一次
-/// 打开导图时看到的那个样子。
-///
-/// 渲染器是 Core Graphics 那套（`MindMapExporter`），不是 `ImageRenderer`——
-/// 后者在这个画布上离屏渲染出过空白页。
 enum MindMapSnapshot {
 
     @MainActor

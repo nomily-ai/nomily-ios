@@ -87,10 +87,6 @@ protocol RecorderFrameCodec {
 
 // MARK: Command set
 
-/// Command code table given by semantics.
-///
-/// All optional, because "protocol does not support a capability" and "not yet reverse-engineered" should be handled the same way by the caller:
-/// The upper layer grays out the corresponding feature. `nil` must never be used as 0.
 struct RecorderCommandSet {
     let startRecording: UInt8?
     let stopRecording: UInt8?
@@ -107,7 +103,6 @@ struct RecorderCommandSet {
     /// Protocol extension commands, keyed by semantic name (e.g., "massStorage" / "wifiAP" / "bind")
     let extended: [String: UInt8]
 
-    /// Use this when none can be filled, indicating "command set not yet reverse-engineered".
     static let unknown = RecorderCommandSet(
         startRecording: nil, stopRecording: nil, recordingStatus: nil,
         recordingStartedEvent: nil, recordingStoppedEvent: nil, liveStream: nil,
@@ -215,99 +210,6 @@ struct RecorderWifiProfile {
         isVerified: true
     )
 
-    /// TicNote NE-79 — **WebSocket on 8081, completely different protocol from V05E**.
-    ///
-    /// ## ★ 2026-10-08 Round seven: Decompiled official APK, disproving the "align with V05E" assumption
-    ///
-    /// Old values (`192.168.88.1` / `6718` / `0xAA` / text commands) were **copied from V05E as a guess**, not measured.
-    /// New evidence:
-    ///   · `com/mobvoi/wifi_plugin/socket/WifiProtocol.java`：
-    ///     `public static final int WEB_SOCKET_PORT = 8081;`
-    ///     Moreover, the whole stack is `org.java_websocket.server.WebSocketServer` — **not raw TCP**.
-    ///   · Full-text search: `8081` appears in **Java**, Dart snapshot hits 0;
-    ///     while `6718` / `192.168.88.1` / `0xAA` hit 0 in both **Dart and Java** ——
-    ///     proving they have never been TicNote values.
-    ///
-    /// ## Frame format (`com.mobvoi.wifi_plugin.socket.WifiDataVo`)
-    /// ```
-    /// Both directions are isomorphic:
-    ///   [0..2]  totalLen  u24 LE   (includes its own 3 bytes)
-    ///   [3]     version   = 1
-    ///   [4..5]  cmder     u16 LE
-    ///   [6..7]  jsonLen   u16 LE
-    ///   [8..]   json      (jsonLen bytes)
-    ///   [...]   bin       (remaining = totalLen − 8 − jsonLen)
-    /// ```
-    /// **No magic number, no CRC** — therefore `frameMagic` is set to `nil`.
-    ///
-    /// ## cmder table (`WifiProtocol.WifiRequest` / `WifiResponse`)
-    /// ```
-    ///   0 UNIVERSAL_ERR        1 HANDSHAKE           2 SAY_HELLO
-    ///   3 HEARTBEAT(_PONG/_PING)  4 WIFI_CLOSE       5 TIPS
-    ///  11 GET_FILE_LIST       12 FILE_SYNC / FILE_SYNC_STATUS
-    ///  13 FILE_SYNC_CONTENT   14 FILE_DELETE        15 FILE_SYNC_STOP
-    /// 100 SPEED_TEST         101 GET_LOG
-    /// ```
-    /// ⚠️ `12` is called `FILE_SYNC` on the request side and `FILE_SYNC_STATUS` on the response side, **the same number**,
-    /// do not treat them as two commands.
-    ///
-    /// ## All connection parameters are delivered by the BLE side
-    /// The card pushes them via BLE events (Dart `nveasy_ble_plugin` + `device_manage/wifi_logic.dart`):
-    /// ```
-    /// WifiStatusEvent {
-    ///   wifiOpened, wifiStatus,
-    ///   wifiSsid, wifiSsidPassword,      ← hotspot name + password
-    ///   wifiServerIp, wifiServerPort,    ← card-side server (the one we connect to)
-    ///   wifiClientIp, wifiClientPort,
-    ///   wifiMac
-    /// }
-    /// ```
-    /// `wifi_logic.dart` parses by extracting `"ssid"` / `"passwd"` from the map.
-    /// Hence `credentialsFromBLE = true` is correct, but **host must never be hard‑coded**.
-    ///
-    /// ## Known entry barriers for "Wi-Fi Fast Transfer" in the official App (obtained via decompilation)
-    ///   · It is a **standalone feature page**: `myDevice_WiFifasttransmission` → `WiFiFastConnection`
-    ///     → `WiFiFastTransmission`. **Not auto-triggered**; you must manually pick a file and then tap Transfer;
-    ///   · Has switches and capability flags: `open_wifi_fast_transfer` / `switchWifi` / `useWifi` /
-    ///     `autoConnectWifi` / `supportWifi`；
-    ///   · Low battery gets blocked (`watch_wifi_low_battery`), plus there is `wifiOperationTimeout`;
-    ///   · One gate check compares device type against `"watch"`; otherwise it logs
-    ///     `[WifiLogic] current device type: X, not a watch device, skipping WiFi event handling` and returns directly.
-    ///     The device type enum is `watch` / `card`, and **TicNote is `card`** — so that path is skipped;
-    ///     The card's WiFi fast transfer goes through `mobvoi_wifi_plugin` (`wifi_logic` and `recording_logic`
-    ///     both reference it).
-    ///
-    ///   ⛔ Correction (real-device round fifteen): **no need to enter the "independent feature page"**. The top bar on the home page
-    ///   “N audio files pending sync + enable WIFI fast transfer” bar, tap it to get the fast‑transfer confirmation dialog,
-    ///   which goes through `mobvoi_wifi_plugin`. Reproduction steps are in `protocol-notes.md` §18.5.
-    ///
-    /// ## ✅ Round eight: The previously unfit parts have now been accommodated
-    /// `transport` field makes explicit "what this protocol looks like",
-    /// so empty strings in `commands` are no longer an ambiguous signal. The actual implementation can be found in:
-    ///   · `TicNoteWifiProtocol.swift` — byte‑level implementation of frames and JSON (written line‑by‑line from `WifiDataVo.java`)
-    ///   · `TicNoteWifiSession.swift` — state machine (pure logic, offline replayable)
-    ///   · `TicNoteWifiLink.swift` — `NWListener` server + hotspot join + cleanup
-    ///   · `Sources/Services/Net/WebSocketFraming.swift` — minimal server implementation of RFC 6455
-    ///
-    /// ## ⛔ `isVerified` remains `false`, but **the reason has been changed** (round fifteen)
-    ///
-    /// ~~What blocked it was "not even capturing the shape of the Wi-Fi credentials over BLE"~~ ← **Voided.**
-    /// The official app ran a full fast-transfer pass on a real device (`protocol-notes.md` §18); conclusion:
-    ///   · **Credentials don't need to be captured** —— `SSID = "TicNote-" + last 4 digits of SN`, `password = last 8 digits of SN`,
-    ///     computable entirely locally (`TicNoteWifiCredentials.from(sn:)`);
-    ///   · **The bind frame must be sent first** before `01 0a 00`; otherwise the card only replies with the identity frame and never opens the hotspot (§17.1);
-    ///   · Joining the hotspot must use the peer-to-peer approach (iOS `NEHotspotConfiguration.joinOnce`),
-    ///     don't use "saved networks"——it would be suppressed by a Wi-Fi with internet access.
-    ///
-    /// So `isVerified: false` currently means **"Nomily hasn't run it on the device yet on its side"**:
-    /// The protocol, credentials, and timing are all defined, and the code is wired up (`TicNoteLink.fastTransfer` →
-    /// `TicNoteWifiLink`). Running it once on the device will set it to `true`.
-    ///
-    /// ## ⚠️ Direction correction (round 8)
-    /// This originally said "`wifiServerIp` / `wifiServerPort` = card-side server (the one we connect to)".
-    /// **Reversed.** The phone is the server (`WifiPlugin.openSocket` → `WebSocketServer`),
-    /// the card is the client that connects in. So `port: 8081` means **the port we listen on ourselves**,
-    /// not "the port to connect to". See the top of `TicNoteWifiProtocol.swift` for details.
     static let ticnote = RecorderWifiProfile(
         host: "",                  // ← Do not hardcode. After the direction correction, the phone is the server; this field is only for logging.
         port: 8081,                // ← WifiProtocol.WEB_SOCKET_PORT (hardcoded default value)

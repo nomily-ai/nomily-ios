@@ -33,15 +33,6 @@ enum WatchHomeStyle {
     static let dim = Color.white.opacity(0.45)
 }
 
-// MARK: - 顶栏时钟（已移除，2026-11-02）
-//
-// 这里曾经有一个 `WatchClockFace`：照 v3 原型在右上角画「时间 + 页码条」。
-// 真机上它和 **watchOS 系统状态栏的时间**并排出现，屏幕上是两个一模一样的时间
-// （`persistentSystemOverlays(.hidden)` 只压掉导航栏那一层，压不住状态栏）。
-// 用户："顶部右上角已经有时间了，这个 bot 的右上角就不要出时间"。
-//
-// ⚠️ 别再把它加回来。页码条现在由 `WatchRecorderView.topBar` 单独摆放，
-//    并且向下让开系统时间那一行。
 
 // MARK: - LISTENING 呼吸点
 
@@ -118,13 +109,6 @@ struct WatchRecentsPane: View {
                 if store.recaps.isEmpty {
                     emptyState
                 } else {
-                    // ★★ 2026-11-04（用户："右滑的最近要能看到 30 条摘要，时间最新的排在最上面，
-                    //   每条要有一个主题，点主题看这条摘要"）：
-                    //   · 条数 6 → **30**（上限在 `WatchRecap.limit`，这里只是"全都显示"）；
-                    //   · 顺序由 `WatchRecapStore.prune` 统一按 `recordedAt` 倒序排好，
-                    //     这一层不再自己 sort —— 两处各排一次，早晚会排成两种顺序；
-                    //   · 每行的主标题换成 `recap.topic`（一行能扫完的主题），
-                    //     完整标题留在详情页。
                     ForEach(Array(store.recaps.prefix(WatchRecap.limit))) { recap in
                         NavigationLink {
                             WatchRecapDetailView(recap: recap)
@@ -136,8 +120,6 @@ struct WatchRecentsPane: View {
                 }
             }
             .padding(.horizontal, 10)
-            // ★ 2026-11-03 二轮（用户："顶部跟底部的显示好像又没用全"）：顶部 30 → **12**。
-            //   页码条在底部、右上角只有系统时间一行，30pt 的让位等于把第一行标题摁到半屏以下。
             .padding(.top, 12)
             .padding(.bottom, 16)
         }
@@ -278,9 +260,6 @@ struct WatchSyncPane: View {
     @EnvironmentObject private var model: WatchRecorderModel
     @EnvironmentObject private var link: WatchLink
 
-    // ★ 2026-11-03 八轮（用户："立即同步的按键橙色背景需要跟随主题颜色，进度条也是"）：
-    //   「立即同步」和进度条以前写死暖色 amber——那是"系统在说话"的语义色。
-    //   用户要它们跟眼睛/波形同一支主题色。这里读同一对 store（与录音页一致）。
     @ObservedObject private var styleStore = WatchRingStyleStore.shared
     @ObservedObject private var faceStore = WatchFaceStore.shared
 
@@ -293,10 +272,6 @@ struct WatchSyncPane: View {
     @State private var freeSpace: String?
 
     var body: some View {
-        // ★ 2026-11-03（用户："手表屏幕没有把屏幕利用完全，立即同步的按钮只显示了一半"）：
-        // ① 包进 `ScrollView`——之前内容一高，最底下的「立即同步」就被裁掉半截；
-        // ② 顶部留白 36 → **12**（页码条在底部，顶部只剩系统时间一行，不用让那么多）；
-        // ③ 大数字 44 → **36**，把竖向空间还给列表和按钮。
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(L10n.Watch.syncToPhone)
@@ -357,9 +332,6 @@ struct WatchSyncPane: View {
                     .buttonStyle(.plain)
                     .padding(.top, 10)
 
-                    // ★ 2026-11-03（用户："这个页面跟等待同步到 iPhone 页面重复了"）：
-                    // 「待传队列」独立页删除，列表搬到这里——同步页从此是"待传"的唯一入口：
-                    // 上面是量与操作，下面是每一份还没到的东西。
                     pendingList
                         .padding(.top, 8)
                 }

@@ -141,7 +141,6 @@ private struct ASRCloudRow: View {
         HStack(spacing: 12) {
             ASRBrandTile(spec: spec)
             VStack(alignment: .leading, spacing: 2) {
-                // ★ 2026-10-29（饭耳规格 §1.1）：行首带选型建议角标。
                 HStack(spacing: 4) {
                     Text(spec.localizedName).foregroundStyle(.primary)
                     if let rec = spec.localizedRecommendation {
@@ -198,8 +197,6 @@ private struct ASRBrandTile: View {
     var size: CGFloat = 32
 
     var body: some View {
-        // ★ 2026-11-02（用户："asr 的模型图标要按照 Apple Store 的 app 图标"）：
-        // 有官方 App 的厂商渲染 App Store 彩色图标；其余保留单色品牌瓦片。
         if spec.usesAppStoreIcon {
             Image(spec.brandAsset)
                 .resizable()
@@ -274,8 +271,6 @@ struct ASRCloudSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(spec.name).font(.headline)
                             Text(spec.localizedTagline).font(.caption2).foregroundStyle(.secondary)
-                            // ★ 2026-10-29（饭耳规格 §1.1）：价格/能力/选型参考。
-                            // 价格是刊例粗算，随时可能调——footer 里也会写明。
                             if let meta = spec.metaLine {
                                 Text(meta).font(.caption2).foregroundStyle(.secondary)
                             }
@@ -284,9 +279,6 @@ struct ASRCloudSheet: View {
                             }
                         }
                     }
-                    // ★ 2026-11-02（用户："该有对应配置页面点击跳转而不是要用户手动
-                    // 输入网址"）：控制台直链放在凭据输入框**上面**——先拿 Key 再填，
-                    // 顺序和操作一致。footer 里的文字路径保留作参考。
                     if let url = spec.consoleURL {
                         Link(destination: url) {
                             HStack(spacing: 6) {
@@ -301,9 +293,6 @@ struct ASRCloudSheet: View {
                             }
                         }
                     }
-                    // ★ 2026-11-02（用户："不会获取 APIkey……新增一个不会开通？
-                    // 复制提示词跟粘贴结果，参考饭耳的这个快引导"）：控制台直链
-                    // 下面挂 Key 快引导——复制提示词问 AI，粘贴回复自动填。
                     Button {
                         showKeyWizard = true
                     } label: {

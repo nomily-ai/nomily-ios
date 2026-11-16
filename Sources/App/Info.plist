@@ -45,9 +45,9 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Nomily AI connects to your D·NOTE recorder over Bluetooth to list, transfer and transcribe recordings.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Nomily AI scans the QR code that carries a DingTalk A1 credential, so it never has to go through the clipboard.</string>
+	<string>Nomily AI uses the camera only when you choose to scan a supported configuration QR code.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Nomily AI connects directly to your recorder (D·NOTE, TicNote, soundcore Work 飞书录音豆) over its Wi-Fi access point during Fast Transfer.</string>
+	<string>Nomily AI connects directly to your recorder over its Wi-Fi access point during Fast Transfer.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Nomily AI records a rough location when your recorder card disconnects, so it can tell you where you last had it. It asks for the position once, only at that moment, and never tracks you.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

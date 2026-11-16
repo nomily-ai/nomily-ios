@@ -47,15 +47,6 @@ enum LLMCompletionError: LocalizedError {
     }
 }
 
-/// ★ 2026-11-06（饭耳 1.0 移植 P1-4）：推理力度档。
-///
-/// 饭耳 1.0 在问答输入条上给了"推理力度"芯片（low/medium/high）；这里做成
-/// **全局默认档**，摘要 / 大纲 / 问答共用——理由很实际：用户对"要快还是要深"
-/// 的偏好是稳定的，按页面各设一份只会让人忘了上次在哪改的。
-///
-/// `.auto` 默认**不发送** `reasoning_effort`：OpenAI 兼容面上支持这个参数的
-/// 只有一部分模型（o 系列 / gpt-5 系 / 部分中转），对不支持的模型塞进去就是 400。
-/// 所以能力是"用户显式开启"的，而不是默认打开。
 enum LLMEffort: String, CaseIterable, Codable, Identifiable {
     case auto, low, medium, high
 
@@ -692,10 +683,6 @@ struct LLMCompletionService {
         providerKey: String, systemPrompt: String, userContent: String, config: AppConfig
     ) async throws -> Completion {
         let providers = config.llmProviders
-        // ★ 2026-11-06（饭耳 1.0 移植 P1-4）：推理力度档。摘要 / 大纲 / 问答
-        // 三条链路都从这里出发，所以**只读一次配置**就覆盖全部请求。
-        // `.auto` = 不发送 `reasoning_effort`，行为与旧版一致（不认识该参数的
-        // 厂商不会被我们塞一个 400 进去）。
         let effort = LLMEffort(rawValue: config.llmEffort ?? "") ?? .auto
         switch providerKey {
         case "openai":

@@ -135,16 +135,7 @@ final class AppEnvironment: ObservableObject {
         autoSummaryTemplate = SummarizeTemplateStore.defaults.first
         transcription.onTranscribed = { clip in
             Task { @MainActor in
-                // ★ 2026-10-22 (任务三): the unified AiTask ledger advances with
-                // the real queues. Runs before auto-summary so the pipeline can
-                // observe whether a summarize job was actually enqueued.
                 AiTaskCenter.shared.transcribeDidFinish(clipName: clip)
-                // ★ 2026-11-04（用户："现在没声纹处理你没办法判断我说话"）：
-                // 转写刚落盘就问一句"这些人里哪个是我"。有声纹才会做事，
-                // 没声纹是一次磁盘存在性检查就返回。
-                //
-                // 放在 auto-summary **之前**：摘要读的是说话人名字，先认出本人，
-                // 摘要里那一句才会写成"我"，而不是事后再改一次名字重跑摘要。
                 let userName = AppEnvironment.shared?.config.config.userName
                 await VoiceprintService.shared.identify(clip: clip, userName: userName)
                 AppEnvironment.shared?.maybeAutoSummarize(clipName: clip)
@@ -152,24 +143,12 @@ final class AppEnvironment: ObservableObject {
                 // Same hook as auto-summary — manual, auto-after-download and the resumed
                 // queue all funnel through this one callback, so one line covers all three.
                 TranscriptionBannerCenter.shared.enqueue(clipName: clip)
-                // ★ 2026-10-29 (饭耳移植 · 规格 §2.3): WebDAV backup — new transcripts
-                // sync to the user's server right away. No-op unless WebDAV is
-                // configured (the service checks `webdav.isConfigured` itself);
-                // reads the config when it runs, so edits made meanwhile are picked up.
-                //
-                // ★ 2026-11-09（用户："是否是每条录音都传输吗…需要一个选择筛选"）：
-                // 自动上传范围听 `auto_upload_scope` 的——"manual" 这里不送；
-                // "with_summary" 也不在这里送，改挂在摘要完成钩子上（JobRunners）。
                 let scope = AppEnvironment.shared?.config.config.autoUploadScope ?? "all"
                 if scope != "manual", scope != "with_summary" {
                     if let config = AppEnvironment.shared?.config {
                         let cfg = config.config
                         Task { await WebDAVSyncService.shared.sync(clipName: clip, config: cfg) }
                     }
-                    // ★ 2026-10-30（用户："增加自动上传到 iCloud 或者指定的服务器"）：
-                    // 文件夹目的地走同一条钩子——所选文件夹在 iCloud 云盘里时，
-                    // 这就是"自动上传 iCloud"。服务自检 autoEnabled + 书签，
-                    // 没开/没选就是 no-op。
                     Task { await FolderExportService.shared.export(clipName: clip) }
                 }
             }
@@ -196,18 +175,8 @@ final class AppEnvironment: ObservableObject {
         // taps, and this shouldn't rely on the user happening to pass through the Library. It also lets the launch-timing stats
         // count it in (it only pulls the unfinished items out and queues them; it doesn't await itself).
         transcription.resumePending()
-        // ★ 2026-10-29 (饭耳移植): hand the night-shift worker its services, and
-        // submit the first request right away — iOS needs a pending request even
-        // for tonight's window, and re-submitting from scenePhase .background
-        // refreshes it with the newest conditions. The switch itself is read
-        // again at execution time (see `handle`), so turning it off later is
-        // honoured even if a request is already queued with the system.
         NightlyTranscribeScheduler.shared.configure(transcription: transcription, configService: config)
         NightlyTranscribeScheduler.shared.schedule()
-        // ★ 2026-10-29 (饭耳移植 · 规格 §3.1): timed overnight recording.
-        // ★ 2026-10-30 (用户："定时录音……真正在手表上录"): the scheduler now
-        // drives the WATCH (WatchConnectivity command), not the phone mic; the
-        // wrist clip flows back through the existing transfer pipeline.
         TimedRecordingScheduler.shared.configure(configService: config, watch: watch)
         TimedRecordingScheduler.shared.evaluate()
         // Same reasoning, for the other three kinds of job: resume the unfinished summary / translation / format conversion from last time.
@@ -217,19 +186,10 @@ final class AppEnvironment: ObservableObject {
         //    (the moment the user reopens the app). The "process isn't dead, just switching back" path relies on
         //    `RootView`'s scenePhase — both are needed; see the comment there.
         jobs.resume()
-        // ★ 2026-10-29 (用户："常用词汇里面从历史的文档里面提取")：首次启动 +
-        // 每周一次，从全部转写里挖高频专名自动进词表。后台编排，不挡启动。
         if VocabularyStore.shared.shouldAutoMine() {
             VocabularyStore.mineOffMain()
         }
-        // ★ 2026-10-22 (任务三): reconcile the AiTask ledger against what the
-        // two queues actually replayed — interrupted pipelines get their honest
-        // verdict instead of sitting in "transcribing" forever.
         AiTaskCenter.shared.recoverAtLaunch()
-        // ★ 2026-10-29 (饭耳移植 · 规格 §2.2): the cold-data downgrade pass.
-        // Fire-and-forget: re-encoding runs off the main actor inside the
-        // service; the switch and tier are read when it starts. No-op unless
-        // the user picked a tier and turned the toggle on.
         if config.config.coldDataDowngradeEnabled,
            config.config.recordingQualityTier != nil {
             let cfg = config.config
@@ -275,8 +235,6 @@ final class AppEnvironment: ObservableObject {
         // 显式重新转写（详情页按钮）不经这里，用户明确要求的覆盖仍然允许。
         let txt = StorageLocations.transcriptURLs(for: fileURL.lastPathComponent).txt
         guard !FileManager.default.fileExists(atPath: txt.path) else { return }
-        // ★ 2026-10-22 (任务三): open a ledger row so the pipeline is one
-        // observable unit (queued → transcribing → summarizing → done).
         AiTaskCenter.shared.transcribeQueued(clipName: fileURL.lastPathComponent)
         await transcription.enqueueAndWait(fileURL: fileURL, enforceMinDuration: true)
         NotificationCenter.default.post(name: .libraryDidChange, object: nil)
@@ -303,12 +261,6 @@ final class AppEnvironment: ObservableObject {
         // a hand-edited result with a fresh machine one.
         guard !FileManager.default.fileExists(atPath: StorageLocations.summaryURL(for: clipName).path)
         else { return }
-        // ★ 2026-11-05（用户："打开全天候录音开关…生成 ADHD 的模板，参考 Plaud，
-        // 丢弃一些无关紧要的不转写需要抓重点"）：全天候开着 + 这条录音来自手表
-        // → 自动摘要改走 **ADHD 友好笔记** 模板。配合 JobRunners 里已有的
-        // SalienceFilter（寒暄/语气词在进 prompt 前就被剪掉），成文就是
-        // "短块、结论前置、行动优先"——正好是全天候场景要的"抓重点"。
-        // 用户自己选过模板的不覆盖不了——这里本来就是"没人选模板"的自动路径。
         let allDayOn = (watch.watchAllDayState ?? false) || (watch.phoneAllDay ?? false)
         let resolved: SummarizeTemplate
         if allDayOn, ClipOrigin.isWatch(clipName),

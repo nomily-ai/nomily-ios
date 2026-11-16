@@ -652,9 +652,7 @@ final class DingTalkA1Link: NSObject, ObservableObject, RecorderLink {
 
     /// `0x0100 {"did", "action":"start", "params":[]}` — the card's own recorder.
     ///
-    /// Command number and fields come from the official client's decompiled `sendAudioRecordOpt`
-    /// (upstream notes §7.3); the exact JSON was never captured verbatim, so after sending we
-    /// **verify through `0x0132`** that `audio_status` actually flipped — a `code:200` on a
+    /// The command is verified through `0x0132` after sending because a `code:200` on a
     /// mis-shaped body would otherwise read as success and leave the user "recording" into air.
     func startRecording() async throws {
         try await runExclusive {
@@ -1033,10 +1031,8 @@ final class DingTalkA1Link: NSObject, ObservableObject, RecorderLink {
     func containerize(_ raw: Data, for recording: RecorderRecording) throws -> RecorderClip {
         let serial = recording.sessionID ?? 0xA1D1_A1D1
         let result = try DingTalkA1Audio.convert(raw, serial: serial)
-        // ★ 2026-11-02（用户："当前系统版本无法播放 opus 录音"）：落盘即转码——
-        // 卡里的裸 Opus 帧直接解成 PCM 封 AAC/m4a，任何 iOS 版本都能播、列表
-        // 时长正确（不再依赖 iOS 17 的 Ogg 解码器）。转码失败回落 .opus（Ogg），
-        // fail-open，绝不因为转码把录音弄丢——和豆（D3200）同一条规则。
+        // Convert raw Opus to a widely playable AAC/M4A file; retain the original
+        // container if conversion fails so recordings are never discarded.
         if let out = SoundcoreTranscoder.transcode(packets: result.packets) {
             return RecorderClip(
                 data: out.data,

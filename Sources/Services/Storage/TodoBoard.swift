@@ -6,32 +6,11 @@ import os.log
 
 private let todoLog = Logger(subsystem: "com.nomily.app.ios", category: "todo")
 
-// MARK: - 待办看板数据层（★ 2026-11-06 · 饭耳 1.0 移植 P0-1）
-//
-// 用户原话（引用饭耳 1.0 逆向报告）："卡片攒了很久，现在处理一下"——待办不该只是
-// 摘要里的一张只读表，它得有**状态**：新抓的（等你决定）→ 要做 → 做完 / 不用做 /
-// 稍后提醒。没有状态机，"今天做完 1 件""都看完了"这类话就无从谈起。
-//
-// ## 为什么另起一份存储，而不是给 `todo.checked.*` 加字段
-// 勾选状态是按「行文本」存 UserDefaults 的，它是**存量**：用户已经勾过的几十条
-// 不能作废。所以这里：
-//  · 新存储 `StorageLocations.todoBoardURL`（App Group JSON，照 `VocabularyStore`）；
-//  · 旧键**只读兼容**——载入和 ingest 时读到 `todo.checked.<recording>` 里有这一行，
-//    就把卡片标成 `done`，旧数据不迁移、不删除；
-//  · 反向保持同步——在卡片上点「做完」也会把这一行写回旧键，摘要详情页的勾选框
-//    跟着变。两条路径读写同一份事实，而不是各说各话。
-//
-// ## id 为什么是 hash 而不是行文本
-// 行文本会随着「重新生成摘要」变化（模型措辞不同），拿它当主键等于每次重生成都
-// 丢一遍状态。`sha256(title|owner|due|recording)` 前 16 hex：同一件事在同一条
-// 录音里稳定，措辞微调也不影响；同时旧键 `todo.checked.*` 仍按行文本读写，
-// 两套 id 各管各的，互不干扰。
 
 // MARK: - 模型
 
 /// 一张待办卡的状态机。
 enum TodoStatus: String, Codable, CaseIterable, Identifiable {
-    /// 刚从摘要里抓出来，用户还没决定（对应饭耳的"清算"队列）。
     case pending
     /// 用户决定要做。
     case accepted
@@ -167,7 +146,6 @@ final class TodoBoard: ObservableObject {
 
     var inboxCount: Int { cards.filter { $0.status == .pending }.count }
 
-    /// 今天做完的件数（饭耳首页「今天做完 1 件」）。
     var doneTodayCount: Int {
         let calendar = Calendar.current
         return cards.filter {
@@ -275,7 +253,6 @@ final class TodoBoard: ObservableObject {
             cards[index].remindAt = when
             TodoNotifier.schedule(cards[index])
         case .accepted:
-            // "要做"但没定时间的，默认明早 8:30 提一次——饭耳的默认就是这个。
             cards[index].remindAt = remindAt ?? TodoNotifier.defaultRemindDate()
             TodoNotifier.schedule(cards[index])
         case .done, .wont, .pending:
@@ -377,8 +354,6 @@ enum TodoNotifier {
 
     private static let center = UNUserNotificationCenter.current()
 
-    /// 默认提醒时间：**明早 8:30**；若现在还没到今早 8:30 就用今早。
-    /// 对齐饭耳"下次 明早 8:30"，也符合"早上起来看昨天欠了什么"的作息。
     static func defaultRemindDate(now: Date = Date()) -> Date {
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: now)

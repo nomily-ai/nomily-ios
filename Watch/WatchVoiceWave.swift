@@ -80,9 +80,6 @@ struct WatchVoiceWave: View {
                 )
             }
         }
-        // ★ 2026-11-03 七轮（用户："波纹可以再长再宽一点，录音的时候太小"）：
-        //   宽 1.10 → **1.26**、高 0.68 → **0.80**（跨出脸框也没关系，那一框不裁剪）。
-        //   45mm 上宽约 189pt（屏 198），两侧渐隐带刚好贴着表盘边缘。
         .frame(width: size * 1.26, height: size * 0.80)
         // ★ 2026-11-03（V4）：两端渐隐改用**外挂 mask**——`Canvas` 里对每段 path 手算
         // 渐变既繁琐又慢，一个横向 LinearGradient 的 mask 一次搞定，且只渲染一次。
@@ -175,8 +172,6 @@ struct WatchVoiceWave: View {
         )
     }
 
-    /// ★ V4：0.028 → 0.014（原型主线 2pt）→ ★ 2026-11-06（用户："线条太细了，加粗一点显得和谐"）
-    /// → **0.022**（45mm 上约 3.3pt，40mm 约 2.7pt）。倒影取一半，随主线一起变粗。
     private static func lineWidth(for size: CGFloat) -> CGFloat {
         max(2.2, size * 0.022)
     }

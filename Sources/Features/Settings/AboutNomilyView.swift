@@ -1,16 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// ★ 2026-10-30（用户："设置下面最顶部加入一个，关于 Nomily" + "顶部一个关于，
-/// 下面一个关于是否是重复了，优化一下下面那个"）：
-///
-/// 唯一的关于页（Plaud 式排版）：图标 + 名字 + 版本号 → 诊断导出 → 官方社交媒体 →
-/// 法规。设置页底部原来的「关于」区（版本行 / 诊断 / 社交图标）已整体搬进这里，
-/// 主设置页不再重复出现第二个"关于"。
-///
-/// 「连点版本号 7 次开开发者模式」的彩蛋一并搬来——点的是头部版本号那行。
-///
-/// ⚠️ 所有链接集中在文件底部的 `Links` 枚举里——换地址只改那一处。
 struct AboutNomilyView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var configService: ConfigService

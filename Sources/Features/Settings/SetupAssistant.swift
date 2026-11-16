@@ -63,7 +63,6 @@ enum SetupAssistant {
     Finally remind me the phone and this computer must be on the same Wi-Fi, and deployment is done only when both verify buttons in the app pass.
     """
 
-    // MARK: - NOMILY-SETUP paste protocol (★ 2026-10-28, 饭耳逆向规格 §1.3)
 
     /// 解析结果——只收四个已知字段，其余行忽略。
     struct ParsedSetup: Equatable {
@@ -158,12 +157,6 @@ struct SetupAssistantRow: View {
     }
 }
 
-/// ★ 2026-10-28（饭耳逆向规格 §1.3「点我粘贴结果」）：解析 AI 输出的
-/// `NOMILY-SETUP` 块（或人类可读的四行信息），把 host/port/地址/模型名
-/// 自动回填进配置——用户不用再对着两个页面手抄。
-///
-/// 放在 `SetupAssistantRow` 旁边（本地 ASR 页 + Ollama 页各一处）：
-/// 复制提示词 → 桌面 AI 跑完 → 回到 App 点这里，闭环在 30 秒内走完。
 struct SetupAssistantPasteRow: View {
     @EnvironmentObject private var configService: ConfigService
     /// 只回填对应目标：本地 ASR 页传 `.asr`，Ollama 页传 `.ollama`；

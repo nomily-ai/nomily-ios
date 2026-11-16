@@ -1674,7 +1674,7 @@
 "plaud.live_custom_failed" = "自定义识别服务中断：%@";
 "plaud.live_azure_fell_back" = "Azure 连接中断，已切换到本机识别，文字会继续。";
 
-/* Phone recording (任务一) */
+/* Phone recording */
 "phone.mode_device" = "设备";
 "phone.mode_phone" = "手机";
 "phone.record" = "录音";
@@ -1688,7 +1688,7 @@
 "phone.caption_unavailable" = "未配置语音服务，实时字幕已关闭；录音本身不受影响。";
 "phone.saved" = "已存入资料库";
 
-/* Document export + email (任务二) */
+/* Document export + email */
 "clip_detail.export_document" = "导出文档";
 "clip_detail.export_as_txt" = "导出为 TXT";
 "clip_detail.export_as_md" = "导出为 Markdown";
@@ -1704,14 +1704,14 @@
 "clip_detail.email_subject" = "Nomily — %@";
 "clip_detail.email_body" = "附件由 Nomily 导出。";
 
-/* AiTask (任务三) */
+/* AiTask */
 "jobs.ai_task_interrupted" = "已中断——应用在上一步完成前被关闭。";
 
 /* PLAUD 暂停 / 抢占传输（2026-10-22） */
 "plaud.paused_hint" = "已暂停——本次录音仍保持在卡上开启，继续后接着录。";
 "plaud.sync_preempted" = "为了让实时音频开流，传输已暂停——停止录音后会自动继续。";
 
-/* 任务八 · 8.1 寻找卡片（BLE 纯 App 兜底） */
+/* Find recorder */
 "find.header" = "寻找卡片";
 "find.header_for" = "寻找 %@";
 "find.title" = "卡片不在身边";
@@ -1869,9 +1869,8 @@
 "summarize.inspiration" = "灵感推荐";
 "summarize.mine_space_footer" = "这里的语言与 AI 模型会保存为你的默认设置。";
 
-// ★ 2026-10-28（饭耳逆向规格）：称呼 / 常用词 / AI 引导开通粘贴回填
 "profile.user_name" = "AI 怎么称呼你";
-"profile.user_name_placeholder" = "例如：Angel";
+"profile.user_name_placeholder" = "例如：Alex";
 "profile.footer" = "会随每次 AI 整理一起带给模型：让模型知道录音的主人是谁，TA 自己说的话可以标成「名字（我）」。";
 
 "vocab.title" = "常用词";
@@ -1893,7 +1892,6 @@
 "setup.paste_not_found" = "剪贴板文本里没有找到可识别的配置项。";
 "setup.paste_done" = "已填入：%@";
 
-// ★ 2026-10-28（饭耳逆向规格 §1.2）：AI 用量热力图
 "token.title" = "AI 用量";
 "token.today" = "今天";
 "token.this_month" = "本月";
@@ -1904,6 +1902,8 @@
 "token.detail" = "约 %@ token · %d 次调用";
 "webdav.title" = "WebDAV 备份";
 "webdav.credential_guide" = "这里的账号密码是 WebDAV 服务的凭据：群晖 / 威联通 / 绿联 / 飞牛用的就是 NAS 登录账号（前提是已在设备上开启 WebDAV 服务）；坚果云和 Nextcloud 必须用网页端生成的「应用密码」，填登录密码会被拒绝。";
+"webdav.nextcloud_path_hint" = "目录默认是 /remote.php/dav/files/你的用户名/Nomily/，可以选择服务器上的任意已有目录。";
+"webdav.pasted_share_link" = "你粘贴的是网页分享链接，不是 WebDAV 地址。主机只填域名（如 example.com），用户名填你的账号，密码用「应用密码」——目录会自动生成，不需要这条链接。";
 "webdav.setup_footer" = "选你的服务器类型，下一步填地址和账号。目录填错也没关系——测试连接会自动定位极空间的个人空间。";
 
 "webdav.preset" = "服务商";
@@ -2469,7 +2469,7 @@
 "watch.pupil_title" = "瞳孔跟随手指";
 "watch.pupil_hint" = "按住屏幕时，眼睛会看向手指移动的方向。";
 
-/* ---- 待办看板（2026-11-06 · 饭耳 1.0 移植 P0-1）---- */
+/* ---- To-do board ---- */
 "todo.title" = "待办";
 "todo.settings_row" = "待办清单";
 "todo.segment_list" = "清单";
@@ -2509,7 +2509,7 @@
 /* ---- ASR 选型决策树（2026-11-06 · P0-2）---- */
 "asr.cloud.decision_guide" = "不知道怎么选？普通话会议录音 → 阿里云百炼（约 0.1 元/小时，中文 CER 2.25%）；说粤语等方言或外语 → 先试免费的端上 SenseVoice，不够准再上云端；只想快速看个大概 → 苹果自带（免费，一次只认一种语言）。";
 
-/* ---- 推理力度（2026-11-06 · 饭耳 1.0 移植 P1-4）---- */
+/* ---- Reasoning effort ---- */
 "llm.effort_title" = "推理力度";
 "llm.effort_auto" = "自动";
 "llm.effort_low" = "快";

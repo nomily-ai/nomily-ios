@@ -70,8 +70,6 @@ extension Job {
         )
     }
 
-    /// ★ 2026-10-22 (任务二): document export (`txt` / `md` / `pdf`). Same job id
-    /// as the audio export — the two share one slot per recording on purpose.
     static func export(clip: String, format: String) -> Job {
         Job(
             id: "export:\(clip)",
@@ -109,12 +107,6 @@ enum JobRunners {
     ) async throws {
         guard let prompt = job.prompt else { throw JobSourceMissing(what: L10n.Jobs.sourcePrompt) }
         let transcript = try transcriptText(for: job.clipName)
-        // ★ 2026-11-03 十轮（用户："全天候录音别把所有话都转进摘要，只挑重要的部分"）：
-        // 长转写先过一遍 `SalienceFilter`——决策/承诺/数字/风险留下，寒暄与语气词丢掉。
-        // 短转写原样进去（十来分钟的语音备忘，剪一刀只会丢信息，见那个文件顶部的说明）。
-        //
-        // ⚠️ 只作用于**摘要**，不碰转写、不碰翻译：那两样必须逐字完整，
-        //    少一句话就是数据损坏，而摘要本来就是有损压缩。
         let salient = SalienceFilter.reduce(transcript)
         let source = salient.text
         if salient.didReduce {
@@ -127,26 +119,11 @@ enum JobRunners {
         // here (the runner), not in the sheet, so the queue re-runs after an app
         // kill take exactly the same path.
         let adapted = Self.adaptedPrompt(templatePrompt: prompt, source: source)
-        // ★ 2026-10-28（饭耳逆向规格 §1.4 / §3.2）：用户称呼 + 常用词表随 prompt
-        // 注入——词表是提示不是词典（「只是提示，不会把别的词强行换成它」），
-        // 称呼让模型知道录音的主人是谁。附加块放在模板尾部，模板自身的
-        // 结构指令（标题/分节）不受影响。
         let effectivePrompt = Self.withUserContext(templateText: adapted.text, config: config, clipName: job.clipName)
 
         BackgroundKeeper.shared.acquire(.summary)
         defer { BackgroundKeeper.shared.release(.summary) }
 
-        // ★ 2026-11-04 两段式（用户："摘要还是要优化"）：先出事实清单，再按模板成文。
-        //
-        // 为什么值得多花一次调用：旧路径是一步从转写写到模板骨架，模型为了让
-        // 「0. 基本信息 / 1. 核心结论 … 」这些槽位有内容，只能注水或编造——事后
-        // 靠 `SummaryPolicy` 删占位符是治标。事实层把"写什么"和"怎么组织"拆开：
-        // 第一遍只允许写定下来的事实，第二遍拿到的是已经压干净的事实表，
-        // 模板里没有对应的槽位就只能删节（规则 4 明确禁止丢事实）。
-        //
-        // 两个例外不走两段：
-        //   · 极短转写（`adapted.replacedTemplate`）——一句话的备忘没有事实可压；
-        //   · 事实层失败时——回落到一步成文，并记进日志，绝不让用户因为"多了一步"而拿不到摘要。
         let marks = SummaryFacts.marksBlock(clipName: job.clipName)
         let useFacts = !adapted.replacedTemplate && SummaryFacts.shouldBuild(source: source)
         var facts: String?
@@ -233,7 +210,6 @@ enum JobRunners {
             "LLM",
             "summarize ok clip=\(job.clipName) provider=\(outcome.providerKey) chars=\(completion.text.count) truncated=\(completion.truncated)"
         )
-        // ★ 2026-10-28（饭耳逆向规格 §1.2）：每日 token 用量（估算）——热力图数据源。
         TokenUsageStore.shared.record(
             inputChars: effectivePrompt.count + source.count,
             outputChars: completion.text.count
@@ -294,9 +270,6 @@ enum JobRunners {
                 fallbackTitle: RecordingName.displayTitle(for: job.clipName)
             )
             if !digest.points.isEmpty {
-                // ★ 2026-10-30（用户："回顾摘要……在里面可以查看到待办，支持在手表
-                // 里面点击可以同步到手机的待办里面"）：待办随回顾一起推。复用「笔记」
-                // 页同一个提取器（TodoExtract），保证手表上看到的和手机上是同一批。
                 let todos = TodoExtract.fromSummary(text)
                     .map { RemindersSyncService.stripMarkdown($0.text) }
                     .filter { !$0.isEmpty }
@@ -317,10 +290,6 @@ enum JobRunners {
             }
         }
 
-        // ★ 2026-11-06（饭耳 1.0 移植 P0-1 · 待办闭环）：摘要里的行动项同时进
-        //   待办看板。与手表回顾共用同一个提取器（TodoExtract），但看板是**跨录音
-        //   的账本**：这里只采集，状态机（要不要做/做完/稍后）归用户。
-        //   幂等由 `TodoCard.makeID` 保证——重新生成摘要只刷新字段，不重置状态。
         if pageID == NotePage.primaryID {
             await MainActor.run {
                 _ = TodoBoard.shared.ingest(
@@ -615,9 +584,6 @@ enum JobRunners {
         log.info("translated \(job.clipName, privacy: .public) → \(languageName, privacy: .public)")
     }
 
-    /// Format conversion / export. Used to be in `ClipDetailView.runExport`.
-    /// ★ 2026-10-22 (任务二): also handles the document formats `txt` / `md` /
-    /// `pdf` (and `png` = mind-map image) alongside the two audio formats.
     @MainActor
     static func export(_ job: Job, config: AppConfig) async throws {
         guard let raw = job.exportFormat else {
@@ -668,27 +634,6 @@ enum JobRunners {
 
     // MARK: - Source file
 
-    /// The transcript text fed to the model for this recording.
-    ///
-    /// ⚠️ **It must not read `{base}.txt` directly.** The one on disk is
-    ///    written by `TranscriptionService.formatTranscript`, whose rule is
-    ///    "if there are segments use `formatted()` (**with timestamps**), otherwise use the whole text";
-    ///    while the detail page uses `textForSummarization` when starting a summary, whose rule is
-    ///    "if there are speakers use `formatted()`, **if there are no speakers use plain text without timestamps**".
-    ///    The two **differ** in the one case of "there are segments but no speakers were recognised" —
-    ///    reading the file directly would produce structurally different summaries from the same transcript, and the user would just think
-    ///    "this feature works sometimes and not others".
-    ///
-    /// ⇒ Always forward to `summarizableText`, **letter-for-letter the same source** as the detail page.
-    /// ★ 2026-10-28（饭耳逆向规格）：模板尾部附加「用户上下文」——称呼 + 常用词。
-    /// 两者都没配置时返回原文（不产生空行差异）。
-    ///
-    /// ★ 2026-11-04（用户："那个 Angel 只限于手表的转录称呼，其他的都不是"）：
-    /// 称呼**只在录音确实来自手表时**注入。之前是无条件告诉模型"录音的主人是 X"，
-    /// 于是同事递来的录音、会议室的录音、导入的音频，模型都会把某个说话人当成
-    /// "我"，甚至把别人的观点写成用户本人的判断。名字是事实，不能靠猜。
-    /// 现在：手表录音才提名字；其他录音一律不提，如果声纹认出了本人，说话人
-    /// 标签里已经写着名字，模型自然看得到。
     static func withUserContext(templateText: String, config: AppConfig, clipName: String) -> String {
         var lines: [String] = []
         if ClipOrigin.isWatch(clipName),

@@ -1194,67 +1194,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
             TicNoteDiagLog.log("FETCH",
                 "Download started sid=\(sid) target=\(size)B planned=\(plannedSlices) slices")
 
-            // ★★ Send `0x1C` after first performing `0x1D → 0x1E` (official app does this before each segment pull).
-            //
-            // Based on (`captures/bug2-20261008.att.txt` full packet frame-by-frame stats, each of two download sessions once):
-            //
-            // ```
-            //   5774.351 ← 0x14 <sid> 02 00 00 00 00 00   Card announces "record exists" (11 B)
-            //   5774.368 → 0x1D                           ATT **Write Request**
-            //   5774.396 ← 0x13 (Write Response)          Card receives at ATT layer
-            //   5774.492 ← 0x1E                           ACK (124 ms later)
-            //   5774.713 → 0x1C first slice                     status 00, data streams in
-            // ```
-            //
-            // ★★★ 2026-10-10 Completed **full count** (this version has the complete shape):
-            //
-            // | Frame | Direction | Count | Description |
-            // |---|---|---|---|
-            // | `0x1D` | App→Card | **2** | Sent **once per download session**, this is the pre-frame |
-            // | `0x1E` | Card→App | **2** | 1:1 with the above |
-            // | `0x1C` | App→Card | **355** | One per slice in the loop |
-            // | `01 1c 00 <sid> <status>` | Card→App | **355** | 1:1 with above, no missing replies |
-            // | `01 1d 00 <sid> ff ff` | Card→App | **354** | 9 B, card sends a status report **per slice** |
-            //
-            // All three conclusions changed the approach:
-            // · `0x1D` is a **session-level** pre-frame, not per slice — sending it repeatedly in the loop is pointless;
-            // · Card **must** acknowledge `0x1C` (355/355), so "sent with no response" means the pre-frame failed,
-            //   cannot be a "frame byte error" (byte error would cause card to return status `0x02` reject, see NAK below);
-            // · The card's 354 `0x1D` frames **do not require a response** (official never replies, `0x1E` always twice).
-            //
-            // Previously our app **directly** sent 0x1C → card **remained completely silent**
-            // (app-diag-2026-10-10-1502.log 15:01:42 / 15:02:40, two runs, 0 frames in 60 s).
-            //
-            // ⚠️ The meaning of 0x1D here is **not** "stop sync": it toggles the card into a state that will **respond with 0x1C**
-            //    switch (named after the static reverse-engineered table `syncFileStop`, behavior matches real device).
-            //    If 0x1E is not received, **do not abort** the download — better to retry than let a single
-            //    undefined pre-frame block the sole download path.
-            // ⚠️ In the capture the official `0x1D` is a **Write Request**, but **our card only accepts**
-            //    Write Command** (verified on real device, see mapping table in `stopSynchronization()`).
-            //    Do not change the write type just because the capture shows it.
-            // ★★★ 2026-10-10 Real-device log conclusion: this `0x1D` **must be preceded by a full handshake**
-            //      (identity query `01 01 00 02 01 00` → binding frame), otherwise the card never replies with `0x1E`,
-            //      The subsequent `0x1C` just disappears.
-            //
-            // Based on (`/tmp/ticnote-ble.log`, 15 outbound `0x1D` occurrences in one install verification):
-            //
-            // ```
-            //   `0x1D` sent right after the greeting → 10 / 10 all received ← `0x1E`
-            //     └ All 10 of these come from startRecording
-            //       `provisionSession(force: true)` → `stopSynchronization()`
-            //   `0x1D` not immediately after greeting → 0 / 5 never received
-            //     └ All 5 of these are this line in the current method
-            // ```
-            //
-            // Moreover, **13 outbound `0x1C` got no response** — not a byte error in `0x1C`,
-            // It's because the preceding `0x1D` wasn't accepted by the device, which never entered a state that would reply `0x1C`.
-            //
-            // ⚠️ Why `force: true` instead of `false`: `false` would skip when "already sent in this connection"
-            //    and the greeting would **expire** (in failure samples the last greeting is separated from `0x1D` by
-            //    2.3 s / 11.8 s / 281 s). Download is low-frequency, a 0.4 s retransmission cost is negligible.
-            // ⚠️ Order must not be reversed: the device's criterion is "**identity query first, bind frame later**".
-            //    In failure samples it was reversed (bind frame first, identity query 2.3 s later), also no `0x1E` response.
-            //    Retransmitting once corrects it.
             await self.provisionSession(force: true)
 
             self.inbox.drain()

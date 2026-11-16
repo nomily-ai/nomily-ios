@@ -1,22 +1,6 @@
 import Foundation
 import UIKit
 
-/// 把一条录音的「标题 + 日期 + 总结 + 章节时间轴」排版成一份 PDF。
-///
-/// ★ 2026-11-03（用户："上传到 NC 的那个摘要这里面没有，如果是笔记的话这个
-/// 排版也不行"）：服务器上的摘要文件从 `笔记.md`（NC 按纯文本显示，`##` 全是
-/// 裸符号）换成 `摘要.pdf`——NC 对 PDF 有内置预览，点开就是排好版的文档。
-///
-/// ## 为什么不用 UIMarkupTextPrintFormatter（踩过的坑）
-/// 第一版走 打印排版器 + HTML，实测产出的 PDF xref 里登记的对象没写出来
-/// （6/8/10 号对象缺失，PDFKit 报 "failed to find start of cross-reference
-/// table"）——WebKit 的排版是异步的，同步 drawPage 拿不到完整结果。现在改为
-/// **CoreText 确定性排版**：markdown → NSAttributedString → CTFramesetter
-/// 逐页分帧 → `UIGraphicsPDFRenderer` 落盘，全程同步、无外部依赖、页数可控。
-///
-/// ## Markdown 子集
-/// 总结是自家模板产的：`#`–`####` 标题、`-`/`*` 无序列表、`1.` 有序、`>` 引用、
-/// `**粗**`/`*斜*`/`` `码` ``。没覆盖的语法按普通段落兜底。
 enum NotePDFRenderer {
 
     struct Note {
