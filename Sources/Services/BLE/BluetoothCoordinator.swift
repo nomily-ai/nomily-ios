@@ -693,30 +693,6 @@ final class BluetoothCoordinator: NSObject, ObservableObject {
                 central: central,
                 serialNumber: recorder.identityText
             )
-        case DingTalkA1Spec.identifier:
-            // The A1 authenticates with a **per-card credential** that has to be imported once
-            // (see `DingTalkA1Credential`). Resolution order matters:
-            //
-            //   1. match the advertisement's SN tail (`"0655"`) against the stored cards — the
-            //      common case, and the only one that stays correct when the user owns two A1s;
-            //   2. fall back to the single stored card, for the case where the advertisement
-            //      carried no manufacturer data (the fast-reconnect path rebuilds the
-            //      advertisement from cache, so `raw` is empty there).
-            //
-            // Deliberately **not** an error when nothing matches: we still want the card to
-            // appear and connect, so the UI can say "this card needs its credential imported"
-            // instead of the user staring at a scan list that never lists their device.
-            let credential = DingTalkA1CredentialStore.credential(matchingTail: recorder.identityText)
-                ?? DingTalkA1CredentialStore.single
-            link = DingTalkA1Link(
-                peripheral: recorder.peripheral,
-                central: central,
-                credential: credential,
-                // Kept for the mid-connection re-resolve: after the user imports the
-                // credential on the (still connected) link, `ensureAuthenticated` matches
-                // again by this tail instead of failing until a full reconnect.
-                identityHint: recorder.identityText
-            )
         default:
             // A protocol was added to the registry but not wired up here —— the symptom would be "can scan, can't connect", the hardest to track down.
             // Better to throw an error that names the culprit than to silently take the wrong implementation.

@@ -66,10 +66,6 @@ enum OpusOgg {
             packetBytes: 160, channels: 2, sampleRate: 48000,
             samplesPerPacket: 960, preSkip: 312)
 
-        static let dingTalkA1 = Profile(
-            packetBytes: 84, channels: 1, sampleRate: 48000,
-            samplesPerPacket: 960, preSkip: 312)
-
         /// soundcore Work D3200（飞书录音豆）：160 B per packet, mono, 48 kHz, 20 ms（64 kbps CBR）。
         ///
         /// 8.3.6 复核：切片固定 160 B（`sn u32le | flags u8 | 160B data | pad`），

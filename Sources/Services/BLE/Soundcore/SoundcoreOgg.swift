@@ -1,19 +1,5 @@
 import Foundation
 
-// MARK: - soundcore Work / D3200（飞书录音豆）raw frames → Ogg-Opus container
-//
-// Faithful Swift port of Kotlin `SoundcoreOgg.kt` (which ports upstream
-// `tacshi/Soundcore lib/audio/ogg_opus.dart`).
-//
-// The D3200 stream (offline pull and realtime alike) is a **bare concatenation
-// of fixed 160-byte Opus frames** — 20 ms each @ 48 kHz mono. Parameters
-// mirror the verified Android implementation byte-for-byte:
-//
-//  - preskip 3840, serial `'ARKR'` (0x41524B52), 50 frames per page,
-//  - granule starts at 0 and accumulates 960 per frame,
-//  - ★ 2026-10-28（8.3.6 反编译复核）：CBR 定长 160 B 是**精确包长**，包尾 0x00
-//    是合法编码内容——不做尾部零裁剪（裁了 = 短包，libopus INVALID_PACKET）。
-//    不足一帧的传输残留直接丢弃（官方 FileWriterHelper 只 append 整帧）。
 
 enum SoundcoreOgg {
     static let frameSize = 160

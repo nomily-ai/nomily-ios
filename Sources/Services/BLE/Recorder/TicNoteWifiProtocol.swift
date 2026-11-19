@@ -53,33 +53,6 @@ enum TicNoteWifiCmder {
 
 // MARK: - Frame (a line-by-line implementation of `com.mobvoi.wifi_plugin.socket.WifiDataVo`)
 
-/// A value type corresponding one-to-one with `WifiDataVo`.
-///
-/// Wire layout (identical in both directions, **no magic number, no CRC**):
-/// ```
-/// [0..2]  totalLen  u24 LE   ← includes these 3 bytes themselves
-/// [3]     version   = 1
-/// [4..5]  cmder     u16 LE
-/// [6..7]  jsonLen   u16 LE   ← ⚠️ present only when json is non-empty
-/// [8..]   json      (jsonLen bytes)
-/// [...]   bin       (the rest = totalLen − 8 − jsonLen)
-/// ```
-///
-/// ## ⚠️ Two quirks that must be copied verbatim + one deliberate deviation
-/// 1. **When json is empty the `jsonLen` field is not written at all** (`toWriteData` writes it only when `jsonStr` is non-empty),
-///    so a pure control frame has `totalLen` of only `3 + 3 = 6`. The decoder uses `length >= 8` to decide whether the field exists,
-///    so the two sides are self-consistent. The heartbeat PONG is exactly such a frame —— **6 bytes** (self-check §20 pins it down).
-///    A corroborating side note: `init`'s entry check reports "init data too short" on `bArr.length < 6` ——
-///    **6 is exactly the minimum legal length of this format**; two independent pieces of information line up.
-/// 2. **When decoding, each of the two cmder bytes is ANDed with `kotlin.UByte.MAX_VALUE` (= `0x7F`, not `0xFF`)**.
-///    This is an asymmetry in the official implementation (the encoder writes all 8 bits, the decoder drops the top bit).
-///    All existing cmders are ≤ 101 and the high byte is always 0, so the difference is invisible; but we **copy** it,
-///    rather than "fixing" it —— because if the peer ever sends a cmder ≥ 128,
-///    a "spec-compliant" implementation would decode a different number from the official App.
-/// 3. ★ **One deliberate deviation**: on a frame "with bin but without json", the official decoder misreads the first two payload bytes
-///    as jsonLen and then drops the whole bin (it can encode it itself but cannot decode it back).
-///    At that one spot we give the correct result, and **for every frame the official decoder can decode we are byte-for-byte identical to it**.
-///    The full argument is in the comments of `decode(_:)`.
 struct TicNoteWifiFrame: Equatable {
 
     var version: UInt8
@@ -309,10 +282,6 @@ enum TicNoteWifiOutbound {
         )
     }
 
-    /// Fetch file list V2 (`WifiPlugin.java:461-478`): fields identical to V1, only the cmder is 20.
-    ///
-    /// ⛔ **The official App never calls it**, and on real hardware the card rejects it outright (see the top of `TicNoteWifiCmder`).
-    /// Kept only for regression assertions and "future firmware".
     static func getFileListV2(uid: Int64, start: Int64, single: Int64) -> TicNoteWifiFrame {
         TicNoteWifiFrame(
             cmder: TicNoteWifiCmder.getFileListV2,
@@ -496,20 +465,6 @@ struct TicNoteWifiStatus: Equatable {
     var isOK: Bool { raw == 0 }
 }
 
-/// The `cmder == 0` error frame the card sends back: `{"cmd":N,"code":M}`.
-///
-/// ## The semantics are **not guessed**; they were derived by comparing two real-device samples
-/// ```
-/// We send  → cmder 20  {"single":1,"start":0,"uid":0}      (fetch list V2)
-/// Card connects back  ← cmder 1   {"status":0}                        (handshake accepted)
-/// Card connects back  ← cmder 0   {"cmd":20,"code":3}                 (explicitly says cmd 20 was not accepted)
-/// ```
-/// `cmd` is **the cmder of the rejected request** (20 is exactly the one just sent),
-/// and `code` is the card-side reason code. All 4 fast-transfer attempts gave the same pair of numbers.
-///
-/// ⚠️ The value table of `code` has **not been decoded** (the official Java side has no case at all for `cmder == 0` ——
-/// it falls into `default: return`, i.e. when the official App receives this frame it **does nothing**
-/// and keeps waiting for the list). So here the raw values are just laid out for people and logs, and **no** name is invented for them.
 struct TicNoteWifiUniversalError: Equatable {
     /// Command code of the rejected request
     let cmd: UInt16
@@ -602,43 +557,6 @@ enum TicNoteWifiEndpoint {
     static let port: UInt16 = 8081
 }
 
-/// Wi-Fi parameters the card pushes over BLE.
-///
-/// ## The key names now have a **source**; they are no longer guesses
-/// The official plugin's **event dispatch table** reads all 8 keys in one go, and consecutively:
-/// the section of `blutter_out/asm/nveasy_ble_plugin/nveasy_ble_plugin.dart`
-/// `0xdb6f48 → 0xdb72b8`, read in order
-/// `wifiStatus` → `wifiOpened` → `wifiServerIp` → `wifiServerPort`
-/// → `wifiClientIp` → `wifiClientPort` → `wifiSsid` → `wifiSsidPassword`
-/// (the string pool `[pp+0x15d88] … [pp+0x15de0]` also forms one contiguous block).
-/// So this set is the complete field table of the Wi-Fi status event.
-///
-/// ## ★★★ The credentials are actually **computed locally**, not reported by the card (confirmed on a real device with the official App, 2026-10-09)
-/// This overturns the core assumption this type previously held. Original on-device logcat of the official App:
-/// ```
-/// Received WIFI info: {ssid: TicNote-3N9H, passwd: Y36W3N9H}
-/// 🌐 Start connecting to recorder WiFi: SSID=TicNote-3N9H, first 4 chars of password=Y36W***
-/// ```
-/// And this card's SN is `S02510YCY36W3N9H` —— so:
-/// ```
-/// SSID = "TicNote-" + SN[-4:]  →  TicNote-3N9H
-/// Password =             SN[-8:]   →  Y36W3N9H
-/// ```
-/// **Both values are determined purely by the SN.** Just compute them directly with `hotspotSSID(fromSN:)` / `hotspotPSK(fromSN:)`
-/// (see `from(sn:)`); there is **no need** to wait for a `wifiSsidPassword` event over BLE any more.
-/// The full evidence chain and measured timings are in `ticnote-re/protocol-notes.md` §18.
-///
-/// Why the official code looks like "the card reported the password": `WifiPlugin.connectWifi` (Java, from `0x582`) does indeed
-/// take it from `call.argument("ssid"/"passWord")`, and `wifiBean.setCapabilities("PSK")` hard-codes WPA2.
-/// But those two arguments are **computed/assembled by the App itself on the Dart side**,
-/// and `wifiSsid`/`wifiSsidPassword` are merely field names of its internal event channel, not "raw bytes given by the card".
-/// This is also why the "deadlock" of §17 —— "the card doesn't send the password until the hotspot is on, and once the hotspot is on it doesn't send over BLE" —— **never actually existed**:
-/// we had been treating it as "an external input that must be captured".
-///
-/// ## Why BLE frame parsing is still kept
-/// `parse(_:)` / `parseBLEFrame(_:)` are kept for **cross-checking**: if future firmware changes the rule (e.g. no longer derived from the SN),
-/// the card-reported values will disagree with the locally computed ones, and then the card-reported ones win. The naming layer is uncertain
-/// (Dart's `"ssid"`/`"passwd"` vs the transport layer's `wifiSsid`/`wifiSsidPassword`), so **both layers are accepted**.
 struct TicNoteWifiCredentials: Equatable {
     let ssid: String
     /// The `WIFI_CIPHER_NO_PASS` case **exists** (see the three encryption capabilities of `ConnectWifiUtils`),
@@ -710,9 +628,7 @@ struct TicNoteWifiCredentials: Equatable {
         return parse(object)
     }
 
-    // MARK: ★★★ Derived from the SN (confirmed on a real device with the official App, 2026-10-09, see protocol-notes.md §18.1)
 
-    /// Fixed prefix of the fast-transfer hotspot name. The official App also assembles it this way (`TicNote-3N9H`).
     static let hotspotSSIDPrefix = "TicNote-"
 
     /// SSID = `"TicNote-"` + **last 4 characters of the SN**.
@@ -756,64 +672,8 @@ struct TicNoteWifiCredentials: Equatable {
 
 // MARK: - Sent at binding time: token and hotspot name (BLE control frame, goes over BLE, not Wi-Fi)
 
-/// A `cmd = 0x0001` frame the official App sends when **binding** the card, carrying both the
-/// **WebSocket token** and the **card hotspot name**.
-///
-/// ## ⚠️ Correction: the "hotspot name" in this frame is **not the fast-transfer hotspot name** (real device, 2026-10-09)
-/// At the end of round 9, both "what the card's hotspot is called" and "where the password comes from" could only be guessed, so the
-/// `"Back-clip c1 pro"` in this frame was taken as the answer. **Half wrong.** The real device confirmed the fast-transfer hotspot name is
-/// `"TicNote-" + last 4 characters of the SN` (see `TicNoteWifiCredentials.hotspotSSID(fromSN:)`);
-/// `"Back-clip c1 pro"` is merely a field the official App writes into the card **at the moment of binding**,
-/// and the card does not use it when opening its hotspot. This distinction is critical —— using `"Back-clip c1 pro"` with
-/// `NEHotspotConfiguration` will never find the network.
-///
-/// The **real** value of this frame lies elsewhere: it is a **precondition** of `OPEN_WIFI`.
-/// Measured in round 15 (`protocol-notes.md` §17.1): sending `01 0a 00` directly without this frame,
-/// the card replies with only an identity frame, neither ACKing nor dropping the link; with it, the card immediately replies `01 0a 00 00`,
-/// then about 1.8 s later drops BLE to open its hotspot. **That is why it belongs in the main flow.**
-///
-/// ## Evidence chain (verifiable)
-/// 1. **Dart-side frame assembly**: `WriteCmd::sendToken` in `blutter_out/asm/ticnote/util/tools/dartBle/writeBle.dart`
-///    (`addr 0x100ee1c, size 0x4e8`).
-///    In the function body, items are `add`ed in order into a `GrowableList<int>`, among them:
-///    - `r1 = "1234567890000000"` → `getUTF8Bytes()`
-///    - `r1 = "Back-clip c1 pro"` (`[pp+0x2e3c8]`) → `getUTF8Bytes()`
-///      → take `field_b` (the length) → `and w3, w2, #0xff` → yields a **u8 length byte**
-/// 2. **Call site**: `ble.dart :: BluetoothManager::bindDevice` (`0x100edb0` calls
-///    `sendToken()`, right after `setDeviceInfo()`). So it belongs to the **binding flow**,
-///    not the fast-transfer flow —— the card records the hotspot name as a "binding parameter".
-/// 3. **Real-device bytes**: frame 29969 of `captures/att-stream2.txt`
-///    (ATT opcode `0x52` = Write Command, handle `0x000d`), which **appears only once** in the whole capture:
-///    ```
-///    01 01 00 | 02 01 01 | "1234567890000000" | 00×9 | 0d | "Back-clip c1 pro"
-///    ```
-///    The lengths are self-consistent: `3 + 16 + 9 + 1 + 13 = 42` bytes of payload, 45 bytes for the whole frame.
-/// 4. **String pool**: in `blutter_out/pp.txt`, `[pp+0x2e3c8] String: "Back-clip c1 pro"`,
-///    with neighbours `sendToken error/success`, `Field <::.platformType>` and `"sendToken "`,
-///    showing it is the literal at this spot. Note that in the snapshot it is **UTF-16**, so searching the APK
-///    directly as UTF-8 finds nothing (I fell into this trap).
-///
-/// ## The one byte that is not pinned down
-/// `payload[1]`. Besides the two literal `2`s, the `sendToken` assembly also `add`s `platformType` (`static late final int`) and `4`
-/// into the same list, and the count does not match the 3-byte prefix captured by hand —— which suggests the earlier
-/// `_growToNextCapacity()` calls belong to **another** list.
-/// So I froze the whole prefix as the **observed constant** `[0x02, 0x01, 0x01]`,
-/// and assert against the real-device bytes in the self-check. If a future capture on iOS shows the second byte is not `0x01`,
-/// just change this one spot (`provisionPrefix`).
-///
-/// ## ⚠️ Deliberately **not wired in**
-/// This is a **write-to-card** operation. Until there is a second sample (ideally a card never bound by the official App),
-/// the main flow will not send it proactively —— an already-bound card has long had its hotspot name fixed,
-/// and we need not change it. The value of this type now is: turning the real-device bytes of this frame into a permanent regression assertion,
-/// and providing a byte-by-byte checkable starting point for when "Nomily provisions a new card itself" is needed.
 enum TicNoteWifiProvisioning {
 
-    /// ⚠️ **"Value written at binding time", not the fast-transfer hotspot name —— don't use it to connect for fast transfer.**
-    ///
-    /// When binding the card, the official App writes `"Back-clip c1 pro"` into the card (it is in this frame's payload),
-    /// but the hotspot the card actually opens on real hardware is called `"TicNote-" + last 4 characters of the SN`
-    /// (see `TicNoteWifiCredentials.hotspotSSID(fromSN:)` and `protocol-notes.md` §18.1).
-    /// The original is kept only to **compare against the real-device bytes of the official binding frame** (for regression assertions); its lifecycle ends there.
     static let officialHotspotSSID = "背夹 c1 pro"
 
     /// Binding token. The same constant as the token used in the WebSocket handshake

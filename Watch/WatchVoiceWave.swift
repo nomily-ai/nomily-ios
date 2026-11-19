@@ -1,27 +1,5 @@
 import SwiftUI
 
-// MARK: - The waveform while recording（★ 2026-11-03 · V4 原型重写）
-//
-// 用户原话："录音的那个波纹需要按照那个网页里面来，不要现在这种发光的了。"
-//
-// ## 上一版为什么被换掉
-// revision sixteen 把波形做成了"ECG 发光 + 上升粒子"——单看很炫，但放进 V4 的四页里
-// 它是唯一的"发光体"：菜单/最近/同步三页全是"黑底 · 白线 · 一点暖色 · 一条线"的哑光材质，
-// 录音页一开录整个脸都在发光，风格一下就散了。V4 原型（`nomily-watch-v4-full.html`）
-// 的波形只有两笔：
-//
-// | 层 | 参数（原型） | 说明 |
-// |---|---|---|
-// | 主线 | 2pt，主题色（`--eyecolor`），`stroke-linecap: round` | 一根线，.mid 在画布**正中** |
-// | 倒影 | 同一条路径垂直镜像，1pt，opacity 0.16 | `echoG`，"线在水面上"的那点质感 |
-// | 两端渐隐 | 横向 mask `0→白(14%)→白(86%)→0` | 线从屏幕两缘"长出来"，不是被裁断 |
-//
-// 没有 fill、没有粒子、没有发光、没有头点。安静时就是一条贴着中线的静止细线——
-// 它本身就是"轴"，不需要再画一条 baseline。
-//
-// ## 保留下来的两件事
-// ① **插值滑动**（revision 16 ①）：采样 12.5Hz，两槽之间按时间插值连续左移，不跳格；
-// ② **高度 = 真实电平**（revision 9 起的红线）：粒子可以删，"假波形是负债"不能删。
 struct WatchVoiceWave: View {
     /// The current level. `level` decides how tall this slot is; `tick` drives the advance —
     /// see the block at the top of `WatchAudioMeter` (when quiet `level` is constantly 0,

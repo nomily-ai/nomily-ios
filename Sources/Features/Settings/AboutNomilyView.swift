@@ -206,8 +206,6 @@ struct AboutNomilyView: View {
         }
     }
 
-    /// ★ 全部外链地址集中在这里——换账号/换网址只改这一处。
-    /// ⚠️ GitHub 与用户协议/隐私政策是**占位地址**，等 angel 给正式链接后替换。
     enum Links {
         static let x = URL(string: "https://x.com/nomilyai")!
         static let xiaohongshu = URL(string: "https://xhslink.cn/o/Apxk5lURufK")!

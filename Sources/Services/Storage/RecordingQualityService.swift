@@ -25,10 +25,6 @@ enum RecordingQualityTier: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// "约 29MB/小时" — shown in the picker; `asIs` carries the measured default.
-    ///
-    /// ★ 2026-11-05（用户截图：英文界面下拉里"约 29MB/小时（不建议）"）：这三段
-    /// 原来是写死中文——走本地化，英文回落时显示 MB/hour 口径。
     var sizePerHourLabel: String {
         let raw: String
         switch self {

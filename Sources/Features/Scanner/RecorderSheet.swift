@@ -320,13 +320,6 @@ struct RecorderDeviceView: View {
     /// `nil` means "unknown"; coercing it to `false` would incorrectly assert "not plugged in" for the user.
     private var shownCharging: Bool? { liveCharging ?? deviceInfo?.isCharging }
 
-    /// This card is the DingTalk A1 — a couple of rows only exist for TicNote.
-    ///
-    /// ★ (2026-10-19) Charging is one of them: the A1 exposes no charging signal anywhere
-    /// (`0x0132` has no field, `0x013F` returns an empty 200, `0x0136` is unsupported, and the
-    /// `0x000C` event log carries no charging record — all verified on a real card).
-    private var isDingTalkA1: Bool { recorder.protocolID == DingTalkA1Spec.identifier }
-
     // Unbind device (2026-10-12)────────────────────────────────────────────────
     //
     // The three states are kept separate because to the user they are **three different things**:
@@ -569,20 +562,6 @@ struct RecorderDeviceView: View {
                         .font(.callout)
                         .foregroundStyle(.orange)
                     Button(L10n.Common.tryAgain) { Task { await connectAndList() } }
-                    // ★ DingTalk A1 only: a read failure is most often "this card has no
-                    // credential on this phone yet". The way in sits right next to the error,
-                    // and it is **this card's** import page (not a global settings screen) —
-                    // the same per-card rule as `a1CredentialSection` in the device info page.
-                    if recorder.protocolID == DingTalkA1Spec.identifier {
-                        NavigationLink {
-                            DingTalkA1SetupView(
-                                focusTail: recorder.identityText.isEmpty ? nil : recorder.identityText,
-                                focusCardName: recorder.displayName
-                            )
-                        } label: {
-                            Label(L10n.A1.openImport, systemImage: "key.horizontal")
-                        }
-                    }
                 }
             }
 
@@ -653,9 +632,7 @@ struct RecorderDeviceView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 26)
                         .overlay(alignment: .bottomTrailing) {
-                            // ★ (2026-10-19) Never for the A1: it has no charging signal, so the
-                            //   bolt would be dead code pretending to be a feature.
-                            if !isDingTalkA1, shownCharging == true {
+                            if shownCharging == true {
                                 Image(systemName: "bolt.fill")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundStyle(.green)
@@ -685,7 +662,7 @@ struct RecorderDeviceView: View {
     /// the key for deduplication (`deviceSerial`), so it is always displayed here, not as a
     /// "hidden technical detail".
     ///
-    /// Parts are filtered, not blindly joined: the DingTalk A1 has an **empty** model string
+    /// Parts are filtered, not blindly joined when a model string is empty.
     /// (its "model" is the serial tail), and a blind join used to render "SN …0655 · 0655".
     private var cardSubtitle: String {
         var parts: [String] = []
@@ -1391,12 +1368,7 @@ struct RecorderDeviceView: View {
                     Task { await unbindCard() }
                 }
             } message: {
-                // ★ (2026-10-20) A1 wording differs: this is an app-side removal
-                //    (the protocol has no BLE unbind), and the DingTalk cloud binding
-                //    must be removed in the official DingTalk app.
-                Text(recorder.protocolID == DingTalkA1Spec.identifier
-                     ? L10n.TicNoteCard.unbindConfirmMessageA1
-                     : L10n.TicNoteCard.unbindConfirmMessage)
+                Text(L10n.TicNoteCard.unbindConfirmMessage)
             }
         }
     }
@@ -1430,25 +1402,6 @@ struct RecorderDeviceView: View {
 
         // ③
         deviceInfoSection
-
-        // ③b ★ DingTalk A1's **per-card** secret.
-        //
-        // Sits right after the card's identity/battery block because it is the same kind of
-        // fact: "something about this specific piece of hardware". Deliberately not in
-        // Settings — see `A1CredentialSection`'s doc comment for the user's reasoning.
-        if recorder.protocolID == DingTalkA1Spec.identifier {
-            A1CredentialSection(
-                tail: recorder.identityText.isEmpty ? nil : recorder.identityText,
-                cardName: recorder.displayName,
-                // The link re-resolves its credential on the next auth attempt, so all this
-                // needs to do is re-run the read the page already had.
-                onImported: { Task { await connectAndList(showsLoading: false) } }
-            )
-            // ★ (2026-10-19) The five recording modes (DingTalk parity). Sits with the other
-            // A1-only rows; persists app-side **and** writes the card's `mode` param when the
-            // link is up (the key was confirmed by a real `0x0100 get` reply).
-            A1RecordModeSection(link: connectedLink as? DingTalkA1Link)
-        }
 
         // ④
         if let ticNote = connectedLink as? TicNoteLink {
@@ -1772,18 +1725,11 @@ struct RecorderDeviceView: View {
             //    labeling "unknown" as "Not charging" would directly mislead them.
             //    This rule is the same as for the adjacent `batteryText` ("Not read" / "—" / "N%").
             //
-            // ★ (2026-10-19) **Hidden for the DingTalk A1 — that card has no charging signal at all.**
-            //   Probed on a real device: `0x0132` carries no charging field, `0x013F` answers
-            //   `{"code":200}` with an empty body, `0x0136` is `521` (unsupported), and the
-            //   `0x000C` event log never contains a charging record (raw dump checked). A row
-            //   stuck on "—" forever is worse than no row: it reads as "the app is broken".
-            if !isDingTalkA1 {
-                HStack {
-                    Label(L10n.TicNoteCard.chargeState, systemImage: chargingSymbol)
-                    Spacer()
-                    Text(chargingText)
-                        .foregroundStyle(shownCharging == true ? Color.green : Color.secondary)
-                }
+            HStack {
+                Label(L10n.TicNoteCard.chargeState, systemImage: chargingSymbol)
+                Spacer()
+                Text(chargingText)
+                    .foregroundStyle(shownCharging == true ? Color.green : Color.secondary)
             }
             HStack {
                 Label(L10n.TicNoteCard.serialNumber, systemImage: "number")
@@ -1848,19 +1794,11 @@ struct RecorderDeviceView: View {
             // This sentence must be updated together with the **decoded fields**: saying too little makes users think the charging state is guessed,
             // saying too much would turn the two hex groups `0x03` / `0x06` into "decoded".
             //
-            // ★ (2026-10-19) The A1 gets its own sentence — the shared one promises a
-            //   "charging flag in the same battery reply", and that card has no such flag.
-            if isDingTalkA1 {
-                Text("Battery, storage and the serial number come straight from the card. "
-                   + "This card does not report a charging state, so there is no charging row.")
-                    .font(.caption2)
-            } else {
-                Text("Battery and the serial number come straight from the card, and the "
-                   + "charging flag rides along in the same battery reply. The other "
-                   + "replies are shown as raw bytes because their field layout is not "
-                   + "decoded yet.")
-                    .font(.caption2)
-            }
+            Text("Battery and the serial number come straight from the card, and the "
+               + "charging flag rides along in the same battery reply. The other "
+               + "replies are shown as raw bytes because their field layout is not "
+               + "decoded yet.")
+                .font(.caption2)
         }
     }
 
@@ -2551,8 +2489,8 @@ struct RecorderDeviceView: View {
             // 详情页才能显示可跳转的时间点。clipBase 必须去掉扩展名——详情页读的
             // 就是 `<base>.marks.json`（此前带扩展名写入，A1 的标记一直读不到）。
             if let fid = recording.sessionID,
-               connectedLink is DingTalkA1Link || connectedLink is SoundcoreLink {
-                A1MarkStore.writeSidecar(fid: fid, clipBase: (name as NSString).deletingPathExtension)
+               connectedLink is SoundcoreLink {
+                RecorderMarkStore.writeSidecar(fid: fid, clipBase: (name as NSString).deletingPathExtension)
             }
             // ★ Once stored → the bottom "N items pending transfer" counter should decrement, and hide itself when all transfers are complete.
             refreshWifiFallback()
@@ -2696,37 +2634,6 @@ struct RecorderDeviceView: View {
     /// **the card‑info layer** — controlled by `showCardInfo`. Therefore we simply set it back to false,
     /// independent of "where it was entered from".
     private func unbindCard() async {
-        // ★ (2026-10-20) DingTalk A1 branch — the A1 protocol has **no BLE unbind command**
-        //    (the card carries no account ownership; cloud binding lives in the DingTalk
-        //    account, see docs/A1-BLE-Protocol-Spec-v1.0.md). So "unbind" here means
-        //    **app-side removal**: forget the card secret (without it the card can't be
-        //    re-authenticated), the alias and the device-ledger entry, then drop the link
-        //    and stop auto-reconnect. This works identically whether or not the card is
-        //    currently connected — which is the whole point of this fix: the old code
-        //    strong-cast to `TicNoteLink`, so for an A1 the button either stayed disabled
-        //    or fell into the offline path.
-        if recorder.protocolID == DingTalkA1Spec.identifier {
-            guard !isUnbinding else { return }
-            isUnbinding = true
-            defer { isUnbinding = false }
-
-            if let credential = DingTalkA1CredentialStore.credential(matchingTail: recorder.identityText)
-                ?? DingTalkA1CredentialStore.single {
-                DingTalkA1CredentialStore.remove(credential)
-            }
-            aliasStore.forget(identityHex: recorder.identityHex,
-                              peripheralUUID: recorder.id.uuidString)
-            configService.config.devices.removeValue(forKey: recorder.id.uuidString)
-            configService.scheduleSave()
-            bluetooth.disconnect()
-            unbindNotice = L10n.TicNoteCard.unbindSuccess
-            TicNoteDiagLog.log("LINK", "Unbound \(recorder.displayName) (A1, tail \(recorder.identityText)) — credential + ledger removed app-side")
-
-            try? await Task.sleep(nanoseconds: 1_400_000_000)
-            showCardInfo = false
-            return
-        }
-
         guard let ticNote = connectedLink as? TicNoteLink else {
             unbindNotice = L10n.TicNoteCard.unbindOffline
             return
@@ -3105,190 +3012,7 @@ struct RecorderSheet: View {
 
 // MARK: - Used Storage (cmd 0x06)
 
-/// "Used Storage" — the card's own reported capacity and usage.
-///
-/// ## Where the data comes from
-/// Read the response from command `01 06 00` (`WriteCmd::getStorageVolume`), 13 bytes, fixed length:
-/// ```
-/// 01 06 00 | 00 e2 a3 03 | 00 0d a2 03 | 40 9c 00 00 | 00
-///            └─ totalKB ─┘  └─ freeKB ──┘  └  semantics unresolved ┘   └ state
-/// ```
-/// Real device sample: total = 61,071,872 KB (58.24 GiB), free = 60,951,808 KB (58.13 GiB),
-/// The two differ by **117.25 MB** —— both matching the "117 MB / 58.2 GB" shown on that screen of the official App.
-/// This is the verification criterion for this byte layout (units are KB, see `TicNoteStorageInfo`).
-///
-/// ## ⚠️ Do not draw a 0% progress bar
-/// A 0% progress bar looks like "the card is full", while the truth is "unknown".
-/// So if not read, only show a gray text line (`storageNotRead`); while reading, show a spinner.
-///
-/// ## ⚠️ Do not hardcode any card
-/// This section only consumes `RecorderDeviceInfo.storage` (decoded from the current card's response),
-/// and maintains no state of its own — switch to a different card or SN, and it will display that card's capacity.
-/// One card's DingTalk secret — **on that card's own page**, never in Settings.
-///
-/// ## Why it moved here (2026-10-18, the user's own words)
-/// > "The A1 recorder card's key should not appear in the app's general settings — it is not a
-/// >  general setting, it belongs to one specific recording product."
-///
-/// They are right twice over. The secret is **per hardware** — the card verifies a token made
-/// from its own copy (wrong secret ⇒ `501`, measured with `a1_auth_probe.py`), so one import
-/// never covers a second card. And a row under Settings reads as app-wide, which is exactly how
-/// someone ends up importing card B's secret while meaning card A. Here the card **is** the
-/// screen, so "which card" cannot be misread.
-///
-/// It also survives the two states that matter: a brand-new card (import) and a card whose
-/// secret was rotated after the seller unbound it (replace). Both are one tap away, next to the
-/// battery and the serial, which is where a per-device key belongs.
-private struct A1CredentialSection: View {
 
-    /// SN tail from the advertisement (`"0655"`) — the only identity an A1 broadcasts.
-    let tail: String?
-    let cardName: String
-    /// Fired after a successful import so the page can retry the read with the new credential.
-    var onImported: () -> Void = {}
-
-    @State private var credential: DingTalkA1Credential?
-    @State private var showingScanner = false
-    @State private var scannedCode: String?
-    @State private var showingPaste = false
-    @State private var pasted = ""
-    @State private var errorMessage: String?
-    @State private var notice: String?
-    @State private var pendingRemoval: DingTalkA1Credential?
-
-    var body: some View {
-        Section {
-            if let credential {
-                LabeledContent(L10n.A1.cardSN,
-                               value: credential.sn.isEmpty ? "—" : credential.sn)
-                LabeledContent(L10n.A1.cardSecret, value: credential.maskedSecret)
-
-                Button {
-                    showingScanner = true
-                } label: {
-                    Label(L10n.A1.replace, systemImage: "arrow.triangle.2.circlepath")
-                }
-
-                Button(role: .destructive) {
-                    pendingRemoval = credential
-                } label: {
-                    Label(L10n.A1.remove, systemImage: "trash")
-                }
-            } else {
-                Label(L10n.A1.missingTitle, systemImage: "key.slash")
-
-                Button {
-                    showingScanner = true
-                } label: {
-                    Label(L10n.A1.scanAction, systemImage: "qrcode.viewfinder")
-                }
-
-                DisclosureGroup(isExpanded: $showingPaste) {
-                    TextField(L10n.A1.pastePlaceholder, text: $pasted, axis: .vertical)
-                        .font(.system(.caption, design: .monospaced))
-                        .lineLimit(2...5)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                    HStack {
-                        Button {
-                            if let text = UIPasteboard.general.string { pasted = text }
-                        } label: {
-                            Label(L10n.A1.pasteFromClipboard, systemImage: "doc.on.clipboard")
-                        }
-                        .buttonStyle(.borderless)
-                        Spacer()
-                        Button(L10n.A1.importAction) { performImport(pasted) }
-                            .buttonStyle(.borderless)
-                            .fontWeight(.semibold)
-                            .disabled(pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                } label: {
-                    Label(L10n.A1.pasteManually, systemImage: "text.cursor")
-                }
-            }
-
-            NavigationLink {
-                DingTalkA1SetupView(focusTail: tail, focusCardName: cardName)
-            } label: {
-                Label(L10n.A1.howTo, systemImage: "questionmark.circle")
-            }
-
-            if let notice {
-                Label(notice, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-        } header: {
-            Label(L10n.A1.sectionTitle, systemImage: "key.horizontal")
-        } footer: {
-            Text(L10n.A1.sectionFooter)
-        }
-        .onAppear(perform: resolve)
-        .sheet(isPresented: $showingScanner) {
-            QRScannerSheet { code in scannedCode = code }
-        }
-        // Import **after** the scanner has closed — an alert raised while a sheet is being
-        // dismissed is silently dropped, so the scanner would just vanish and look like a no-op.
-        .onChange(of: showingScanner) { isShowing in
-            guard !isShowing, let code = scannedCode else { return }
-            scannedCode = nil
-            performImport(code)
-        }
-        .alert(L10n.A1.importFailed, isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button(L10n.Common.ok, role: .cancel) { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
-        .alert(L10n.A1.deleteTitle, isPresented: Binding(
-            get: { pendingRemoval != nil },
-            set: { if !$0 { pendingRemoval = nil } }
-        )) {
-            Button(L10n.Common.delete, role: .destructive) {
-                if let card = pendingRemoval { DingTalkA1CredentialStore.remove(card) }
-                pendingRemoval = nil
-                resolve()
-            }
-            Button(L10n.Common.cancel, role: .cancel) { pendingRemoval = nil }
-        } message: {
-            Text(L10n.A1.deleteMessage)
-        }
-    }
-
-    /// Same lookup the link uses at connect time (SN tail first, then "the only card on file").
-    ///
-    /// ⚠️ Must mirror `DingTalkA1Link.ensureAuthenticated` exactly. Being stricter here would
-    /// claim "not imported" for a card that actually authenticates (sending the user hunting for
-    /// a key they already have); being looser would claim "ready" for a card that then answers
-    /// `501`. Neither is recoverable by looking at this screen.
-    private func resolve() {
-        credential = DingTalkA1CredentialStore.credential(matchingTail: tail)
-            ?? DingTalkA1CredentialStore.single
-    }
-
-    private func performImport(_ raw: String) {
-        do {
-            let parsed = try DingTalkA1Credential.parse(scanned: raw)
-            DingTalkA1CredentialStore.save(parsed)
-            pasted = ""
-            showingPaste = false
-            resolve()
-            // Importing the *other* card's secret is a live risk — both cards are called
-            // "DingTalk A1" in the list. Saving it is still correct (the user owns both), but
-            // this line is what stops a week of "it authenticates the wrong card".
-            if let tail, !tail.isEmpty, !parsed.sn.hasSuffix(tail) {
-                notice = L10n.A1.mismatch(parsed.sn.isEmpty ? "—" : parsed.sn, tail)
-            } else {
-                notice = nil
-            }
-            onImported()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-}
 
 private struct CardStorageSection: View {
 
@@ -3350,33 +3074,6 @@ private struct CardStorageSection: View {
 
 // MARK: - Microphone Gain (cmd 0x08 write direction)
 
-/// "Microphone Gain" — the item on the official card device page (l10n keys `myNewDevice_Mic` / `myDevice_mkfeng`).
-///
-/// ## This is not the text command family from `nveasy`
-/// The previous version judged it as "gain goes through `nveasy`'s `*APP#micgain#`", **that judgment was wrong**:
-/// `nveasy`'s UUID is `06068d0c-…`, while the probe on a real device only saw two services, `1910` and `180F`,
-/// no `06068d0c` at all; within `blutter_out/asm/ticnote/`, `nveasy` is only referenced by the **headset**
-/// (TicNote Pods), those three files. The real channel is **the write direction of the generic settings `0x08`**:
-/// ```
-/// App→Card  01 08 00 | 02 <rec_led_status> <rec_scene> <rec_mode> <row_data> <micCode>
-/// Card→App  01 08 00 | 00 02 00 01 7f 00 00     ← Reply once upon receipt, i.e., "write success"
-/// ```
-/// Two levels are hardcoded by the official `field_97 = [214, 254]`: index 0 → `0xD6` (UI writes `24 db`),
-/// index 1 → `0xFE` (`36 db`). See `TicNoteMicrophoneGain` / `writePayload(gain:)` for the byte origin.
-///
-/// ## ★ Why the UI displays "the value the card reports"
-/// On a real device the card self-reports `dmic_mode` as **`0x7F` (127)**, **not among `[0xD6, 0xFE]`** —
-/// in other words, **no single reply packet can tell us which gain step is actually in effect right now**.
-/// (The official App likewise falls back to index 0 on the same card, so the `24 db` it shows is also a default,
-/// not a value read back.) This section therefore states it honestly in two parts:
-/// * Which step you set last time (stored locally per card, see the `@AppStorage` key below);
-/// * What the card itself reports (`micGainCardReports`, shown only when the value is "not one of the two steps").
-/// No pretending we read the real value back, and no papering over it with "set to 24 dB".
-///
-/// ## ⚠️ Why not hardcode the current card's value
-/// The setting is stored under **`ticnote.mic_gain.<key for this card>`**, where the key is computed and passed down from the upper layer
-/// (`RecorderDeviceView.cardScopeKey`, prioritizing SN, falling back to peripheral UUID, and normalizing case).
-/// Swapping to a different card means a separate setting — the 36 dB chosen for Card A won't overwrite Card B's setting.
 private struct CardMicGainSection: View {
 
     @ObservedObject var link: TicNoteLink

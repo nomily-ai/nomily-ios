@@ -7,7 +7,7 @@ import Foundation
 // / `guidLooksD3200` / `nameLooksSoundcore`) into the protocol-agnostic
 // `RecorderProtocolSpec` shape, so the bean rides the same
 // scan → `DiscoveredRecorder` → `connectRecorder` → `RecorderSheet` pipeline
-// as TicNote / DingTalk A1.
+// as other recorder cards.
 //
 // ⚠️ Identity signals are **intentionally lenient** (upstream
 // `AdvertisementParser.tryParse`): firmwares split identity across
@@ -133,11 +133,6 @@ enum SoundcoreRecorderSpec: RecorderProtocolSpec {
         return "soundcore device"
     }
 
-    /// 发射前聚合的主键。豆的广播 MAC 是 RPA（随机轮换）且厂商数据并非每帧都带，
-    /// identity 在帧间会漂移，所以按**归一化产品名**聚合（与 Android
-    /// `DeviceScanner.mergeKey` 一致）：
-    /// "soundcore Work" / "soundcore Work · XXXX" / "soundcore Work (XY)" 视为同一台。
-    /// 代价：两颗同名同型号的豆会合并为一条——豆默认名不含序列号时官方 App 也一样。
     static func mergeKey(for displayName: String) -> String {
         var key = displayName
         if let idx = key.firstIndex(of: "·") { key = String(key[..<idx]) }

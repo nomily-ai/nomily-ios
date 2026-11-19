@@ -88,7 +88,7 @@ struct ClipDetailView: View {
     /// **together with** the download that produced this clip, so it cannot change while the page is
     /// open. Keeping it in `@State` (rather than computing it inside `body`) also avoids decoding the
     /// JSON on every redraw — `body` re-evaluates once a second while audio plays.
-    @State private var marks: [A1Mark] = []
+    @State private var marks: [RecorderMark] = []
 
     private enum TranslateTarget { case transcript, summary }
 
@@ -385,7 +385,7 @@ struct ClipDetailView: View {
             }
             // Speaker names are a sidecar of this clip; load once per visit.
             speakerStore.load(clip: item.name)
-            marks = A1MarkStore.sidecar(forClipBase: item.base)
+            marks = RecorderMarkStore.sidecar(forClipBase: item.base)
             loadTranslation()
             loadSummary()
             loadTranslatedSummary()
@@ -1936,7 +1936,7 @@ struct ClipDetailView: View {
         // The "mark" dots belong to the audio timeline — a marker pointing at a deleted recording is
         // noise. `move` skips non-existent paths, so this needs no existence check, and putting it in
         // the same group is what makes restore bring the marks back with the clip.
-        urls.append(A1MarkStore.sidecarURLForTrash(clipBase: item.base))
+        urls.append(RecorderMarkStore.sidecarURLForTrash(clipBase: item.base))
         // When the audio is this item's last remaining piece, `.title` instantly becomes an "orphaned title" — the scanner
         // would use it to rebuild a ghost entry with neither audio nor body text. So it moves together with the audio.
         if let title = ClipTrash.titleSidecar(

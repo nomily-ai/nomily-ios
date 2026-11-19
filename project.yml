@@ -136,12 +136,6 @@ targets:
         NSPhotoLibraryAddUsageDescription: Nomily AI saves an image or video to your photo library only when you ask it to.
         NSRemindersUsageDescription: Nomily AI can add the to-dos from your recording summaries to the Reminders app, so you never lose an action item. Nothing is read back unless you also tick them in Nomily.
         NSRemindersFullAccessUsageDescription: Nomily AI can add the to-dos from your recording summaries to the Reminders app, so you never lose an action item. Nothing is read back unless you also tick them in Nomily.
-        CFBundleURLTypes:
-          - CFBundleURLName: com.nomily.app.ios.a1
-            CFBundleURLSchemes:
-              - nomily-a1
-        # `nomily-a1://import/<base64url>` — the deep link behind that QR code, and behind any
-        # tapped link. Handled in `NomilyApp.LocalizedRoot.onOpenURL`.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UIBackgroundModes:

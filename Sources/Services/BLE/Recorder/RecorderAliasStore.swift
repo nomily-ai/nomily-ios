@@ -1,52 +1,6 @@
 import Combine
 import Foundation
 
-// MARK: - Names given to the card by the user (App-side alias)
-//
-// ## Why "Rename" in this flow is a **local alias** rather than a Bluetooth command
-//
-// The user wants "the ability to modify the current device's name". After checking both possible paths, the conclusion is:
-//
-// **① The official App's path goes through the cloud, which we cannot use**
-// `MyDeviceLogic::changeName`（`blutter_out/asm/ticnote/modules/my_device/my_device_logic.dart`
-// `:10180`) disassembles to: `getDio()` → `_RestClient()` → group `\{"sn": …, \"name\": …\}`
-// → `await changeDeviceName()`. In other words, **the name displayed on the card exists in the Mobvoi account cloud**.
-// We are a local App; we don't have, nor should we have, that account system.
-//
-// **② The card's own BLE command table does not contain a "Rename" entry at all**
-// `WriteCmd` (`blutter_out/asm/ticnote/util/tools/dartBle/writeBle.dart`) has 27 functions
-// Listed individually, they are:
-// ```
-// writeData convertArr2Buffer writeArr getUTF8Bytes
-// syncFile delRecord getSesionList syncFileStop getBatt setUsbMode generalSetting
-// readStatus syncTime readSsn firstHander sendToken getStorageVolume recordEnd
-// recordStart setOtaFinish setOtaData setOta recordPause recordRestore openWifi
-// clearData unbind
-// ```
-// — **None of setName / setBtName / setDeviceName exist**.
-// (The Android SDK side does have `UteBleConnection.setDeviceBluetoothName(String)`,
-// but it ends up in the heavily obfuscated `utejxfor` implementation, and `com.yc.nadalsdk` is a **multi-device family**
-// public SDK; since the corresponding frame cannot be found in the card's command table, there is no real-device verifiable delivery path.)
-//
-// **③ Therefore this implementation provides an "App-side alias", and the UI will explain this clearly:
-// What changes is **the name displayed in this App**, not the name broadcast by the card.
-// This is not bypassing the requirement — the name shown on the card by the official app is also "stored elsewhere and read by the App for display",
-// We simply replace the "elsewhere" from the cloud with the local device.
-//
-// ## Why it must be keyed by **the card's identity**, not a global field
-// The user explicitly mentioned: "Future addition of ticnote cards with non-current SN must also be supported; we cannot hard‑code a single current card"
-// the current card". Therefore:
-//
-// * Use the **card's real identity** as the primary key (TicNote = the ASCII SN in the broadcast, `identityHex`),
-//   It remains stable across device changes/reinstall — the name persists after changing phones;
-// * When `identityHex` is unavailable (old card / broadcast anomaly) fall back to iOS's peripheral UUID,
-//   at least it is consistent within this device session;
-// * **A global "device name" field is incorrect**: otherwise the name set for card A would overwrite that of card B.
-//
-// ## Length limit 20
-// From the official copy pool (`blutter_out/pp.txt`): `\"Name too long (maximum 20 characters)\"`. 
-// The card's own name limit is this number; the alias follows the same limit to avoid a situation where "the App can store 40 characters,
-// but syncing to the card would truncate" – two conflicting rules.
 
 /// The display name of the recorder card within **this App**.
 ///

@@ -51,10 +51,6 @@ enum SecretStore {
         case llmZhipu        = "llm.zhipu.api_key"
         case llmMiniMax      = "llm.minimax.api_key"
         case wifiAPPassword  = "wifi_ap.psk"
-        /// DingTalk A1 credentials (a JSON **array** of `DingTalkA1Credential`, see
-        /// `DingTalkA1CredentialStore`). One slot for all A1 cards: the `Slot` enum is meant to be
-        /// the complete list of secrets, and A1s are few.
-        case dingTalkA1      = "recorder.dingtalk_a1"
     }
 
     static func load(_ slot: Slot) -> String? {

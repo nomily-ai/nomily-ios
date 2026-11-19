@@ -110,10 +110,6 @@ struct ASRCloudSpec: Identifiable, Equatable {
         cerHint.map { NSLocalizedString("asr.cloud.\(id).cer", value: $0, comment: "") }
     }
 
-    /// ★ 2026-11-05（用户截图：英文界面下模型选择页全是中文）：
-    /// `models` 里存的是**要发给 API 的真名**（"录音文件识别（Paraformer）"），
-    /// 存进 config 的必须是原值——这里只翻译**显示层**。英文 UI 从 en 表读
-    /// `asr.cloud.<id>.models.<序号>`，键缺失回落原值（zh-Hans 不用建键）。
     func localizedModel(_ raw: String) -> String {
         guard let index = models.firstIndex(of: raw) else { return raw }
         return NSLocalizedString("asr.cloud.\(id).models.\(index)", value: raw, comment: "")

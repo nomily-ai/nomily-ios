@@ -71,21 +71,6 @@ struct RecorderClip {
 
 // // Storage usage snapshot
 
-/// A card's "used / total" — at the same level as `RecorderDeviceInfo`,
-/// only placing the two quantities that **align across protocols**: total and available.
-///
-/// ## Why a separate type, rather than stuffing `TicNoteStorageInfo` into `RecorderDeviceInfo`
-/// The comment on `RecorderDeviceInfo` says "only fields that can be aligned across protocols", and **capacity is exactly alignable**:
-/// The `DeviceInfo` on the D·NOTE side already has `freeMB` / `totalMB`, while TicNote uses the `0x06` response packet.
-/// Attaching `TicNoteStorageInfo` directly would make the "protocol-agnostic layer" aware of TicNote's private fields
-/// (`thirdField` / `freeState`) — fields that **only make sense for TicNote**, so they stay in
-/// `TicNoteStorageInfo`, and only the two generic numbers are carried over here.
-///
-/// ## Formatting caliber (`formatBytes`)
-/// Copy the official app's display on the same card: **MB without decimals, GB with one decimal**
-/// (On the same time in the real device it’s "117 MB / 58.2 GB").
-/// Placed in this layer instead of in a SwiftUI view, so ... ...  …  … … … … … … … … … … … 
-/// This layer is the only ... … …… …
 struct RecorderStorageInfo: Equatable {
 
     /// Total capacity (bytes).

@@ -1,27 +1,5 @@
 import SwiftUI
 
-// MARK: - Nomily 问答（★ 2026-11-03 十轮，十一轮大改）
-//
-// 用户原话：「APP 里面会增加一个叫 Nomily 的按钮，点击之后可以在里面询问一些说过的话、
-// 录音、待办之类的，相当于询问一个个人知识库一样」。
-//
-// ## 为什么不是把全部录音塞给模型
-// 库里几十条录音、每条几十 KB 转写，全塞进去第一是 token 不允许，第二是模型在
-// 一大堆无关材料里找答案反而更容易编。所以这页的回答分两步：
-// ① **检索**——用 `LibraryKnowledgeIndex`（库内搜索的同一份正文缓存）把与问题
-//    最相关的几条录音找出来；
-// ② **回答**——只把这几条的摘要/相关片段作为材料交给模型，并附上来源标题。
-//
-// ## 十一轮（用户反馈逐条）
-// · 标签图标换成 **App 图标的白色剪影**（`NomilyLogo`，从 nomi-logo.png 抠出来的），
-//   随选中态染色；页面里用彩色原版 `NomilyLogoColor`；
-// · 名字统一 **Nomily**（上一版标签写成了 Nomi）；
-// · 回答**不显示 Markdown 源码**——走 `MarkdownBlocks.parse` 的紧凑渲染；
-// · 键盘三连：发送即收起、下滑收起、工具栏「完成」——上一版键盘常驻把页面钉死，
-//   别的标签都点不到；输入条改 `safeAreaInset`，不再叠在键盘下面；
-// · **历史提问落盘**（Documents/nomily-chat.json）：杀掉 App 重进也在；
-//   空态里列出最近问过的问题，点一下直接再问；
-// · 回答请求加 90s 超时——上一版请求挂住时 `busy` 一直是 true，页面像死了一样。
 
 // MARK: - 检索
 
@@ -226,10 +204,6 @@ final class NomilyChatModel: ObservableObject {
     @Published private(set) var busy = false
     @Published var errorText: String?
 
-    /// 建议的第一问。有历史提问时被「最近问过」取代。
-    ///
-    /// ★ 2026-11-05 十四轮：这三条原来写死中文——英文空态下三条全漏（用户截图）。
-    /// 键缺 en 时回落到这里。
     static var suggestions: [String] {
         [
             NSLocalizedString("nomily.suggest_recent", value: "我最近记了些什么？",
@@ -411,11 +385,6 @@ final class NomilyChatModel: ObservableObject {
     }
 }
 
-// MARK: - 回答的紧凑 Markdown 渲染
-//
-// 用户原话："显示内容不要 md 文档"。上一版直接 `Text(answer)`，模型按提示词
-// 输出的 `**加粗**`、`- 列表` 原样糊在屏幕上。这里复用库内的
-// `MarkdownBlocks.parse`（摘要页同一套解析），只是排版收紧成聊天气泡的密度。
 
 private struct ChatMarkdownText: View {
     let text: String
@@ -487,21 +456,6 @@ private struct ChatMarkdownText: View {
     }
 }
 
-// MARK: - 回答卡片（★ 2026-11-04 十三轮）
-//
-// 用户原话：「底部那个问答页面需要优化…参考他的样式，不要参考他的配色」。
-// 参考稿的结构（不是配色）：品牌头（左标 + 覆盖数）→ 一句大标题直接给答案 →
-// 分隔线 → 逐条证据（左列短日期/时间，右侧标题 + 一句细节 + 来源胶囊）→ 脚注。
-//
-// ## 为什么不让模型自己排版
-// 上一版把整段 Markdown 糊进一个气泡，十条录音挤成一坨字，找"哪天说的"要逐行读。
-// 卡片式的前提是**字段级**的数据（标题、日期、细节各归各位），而自由文本没有字段。
-// 所以让模型只回固定 JSON（见 `NomilyChatModel.parseAnswer`），版式完全由这里决定；
-// 日期/时间/覆盖数都由客户端算——模型转述日期不可靠，让它报"库有多大"只会编。
-//
-// ## 回落
-// `Entry.answer == nil`（旧会话记录、或模型没按格式回）时走原来的 Markdown 渲染，
-// `text` 里始终存着原始全文，长按复制复制的是全文。
 
 private struct NomilyAnswerCard: View {
     let answer: NomilyChatStore.Entry.Answer
@@ -641,24 +595,6 @@ private struct NomilyAnswerCard: View {
     }
 }
 
-// MARK: - 库内速览（★ 2026-11-05 十四轮）
-//
-// 用户原话："有些问题需要提前根据录制文档摘设想好会提问哪些问题，方便点击就直接提问，
-// 然后当前页面添加类似这样待办，相关清单的事项…还有不同时间记录的"（参考图是竞品的
-// 待办卡 / 清单 / 日历页）。
-//
-// 竞品那三页的**信息本质**是：把"你录过什么、欠了什么"在进问答页之前就摆出来，
-// 每一项都是一条已经写好的提问。所以这里不照抄页面，把同一份信息做成空态的三张卡：
-//
-//   ① 待办卡 —— 全库摘要的行动项聚合（谁欠的、几条过期），点一下直接问"待办还剩哪些"；
-//   ② 最近记录卡 —— 按时间列最近几条，每条就是一个"《这篇》说了什么"的提问；
-//   ③ 建议提问 —— 静态三条兜底（有 ①② 时排在最后）。
-//
-// ## 为什么是"扫摘要文件"而不是又一个全局索引
-// 待办本来就活在每条录音的 `.summary.md` 里（`TodoExtract` 是唯一权威解析器），
-// 勾选状态在 UserDefaults 的 `todo.checked.<录音名>`。这里只做**只读聚合**：
-// 不新建存储、不新增状态机，详情页勾掉的待办在这里自动消失——两条数据路径天然一致。
-// IO 在 utility 队列（最多 120 条摘要），结果回主线程。
 
 enum NomilyDigestBuilder {
 
@@ -1056,7 +992,6 @@ struct NomilyView: View {
         .buttonStyle(.plain)
     }
 
-    /// 点卡片/胶囊 = 填入问题并直接发送（用户原话："方便点击就直接提问"）。
     private func askNow(_ question: String) {
         chat.draft = question
         send()

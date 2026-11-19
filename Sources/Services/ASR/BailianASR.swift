@@ -82,11 +82,6 @@ struct BailianASR {
         let size = ((try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.size] as? Int) ?? 0
         let duration = await Self.duration(of: fileURL)
 
-        // ★ 2026-11-05（用户截图：HTTP 400 空错误体 + 来源页"无法打开"）：m4a/mp3/wav
-        // 这类带头部的容器**连时长都读不出来**时，文件本身极可能已经损坏
-        // （录制被强制中断时的截断写——同一份文件播放器也打不开）。服务器端同样
-        // 解不了这种文件，与其发上去收一句"端点返回空错误体"，不如就地说明白。
-        // ogg 不在此列：它的时长走专门的页扫描，扫不出来不代表文件坏。
         if duration == nil, Self.mimeType(for: fileURL) != "audio/ogg" {
             log.error("bailian transcribe: \(fileURL.lastPathComponent, privacy: .public) has no readable duration — refusing to upload a likely-corrupt file")
             throw AsrError.http(0, "这段录音在本地就无法解码——文件疑似损坏（多半是录制被系统中断），转写和播放都会失败；已跳过上传")

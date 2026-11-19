@@ -1694,9 +1694,6 @@ struct LLMProvidersView: View {
     }
 }
 
-/// ★ 2026-10-29（截图 2「添加供应商」）：未配置的服务商一页列全——
-/// 名字 + 一句副标（截图里的"深度求索"这类），点进即弹配置表单。
-/// 不分国内外（用户原话），自定义单独一组放最后。
 private struct AddProviderView: View {
     @EnvironmentObject private var configService: ConfigService
     let editing: Binding<LLMProviderSpec?>
@@ -2865,13 +2862,6 @@ struct RecordingsSettingsView: View {
         // and immediately dismiss.
     }
 
-    /// 钥匙校验行。
-    ///
-    /// 三种"要注意"的状态各有各的实话：
-    /// · 本机没有 → 请设口令（此时设口令会走验证，不会盲写）；
-    /// · 与设备不一致 → 设备上那把不是这台手机能推导出来的（多半官方 App 设的），
-    ///   重设口令没用，只能先解除或导入；
-    /// · 手机锁定读不到 → 什么都别做，解锁后会自己重判。
     @ViewBuilder
     private var keyCheckRow: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -3753,21 +3743,10 @@ struct PassphraseEntrySheet: View {
     }
 }
 
-/// 设备上现役密钥不是这句口令派生的（官方 App / 其他 App / 旧口令），
-/// 固件拒绝带它解除旧密钥（协议 0xA2 规则 2）。
 private struct ForeignKeyKeyError: LocalizedError {
     var errorDescription: String? { L10n.EncryptionOnboarding.foreignKeyBlocked }
 }
 
-// MARK: - ★ 2026-11-06 后台保护指南
-//
-// 用户原话："引导用户去设置里面打开 APP 刷新，然后设置白名单之类的，
-// 即使后台长期不动也要保持不被系统杀掉"。
-//
-// iOS 的诚实答案是：**没有 Android 那样的省电白名单**。系统能给的保活手段只有
-// 后台 App 刷新 + 后台音频（App 已内置静音保活）+ 关低电量，三样都能检测/引导，
-// 所以这一页就是「实时状态 + 去设置的按钮 + 检测不了的项目写清路径」。
-// 极端内存压力下系统仍可杀进程——届时的兜底是 BackgroundKeeper 的被杀哨兵通知。
 struct BackgroundProtectionGuideView: View {
     @EnvironmentObject private var configService: ConfigService
     @EnvironmentObject private var bluetooth: BluetoothCoordinator

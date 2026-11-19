@@ -213,7 +213,6 @@ enum SenseVoiceDownloadError: LocalizedError {
         case .incomplete(let file, let bytes):
             return "\(file) 只下到 \(bytes) 字节，不完整"
         case .allSourcesFailed(let reasons):
-            // 一行一个源，用户截图就能定位是哪一个源被挡。
             return reasons.joined(separator: "\n")
         }
     }

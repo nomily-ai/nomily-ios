@@ -2,21 +2,6 @@ import MapKit
 import SwiftUI
 import UIKit
 
-/// PLAUD sheet — dual mode (2026-10-21).
-///
-/// **Direct connect (primary, recommended)** — SDK takeover, same mental
-/// model as the other recorder cards (A1): fill the developer Client ID +
-/// Secret once (dev.plaud.ai), then Bluetooth scan → connect → pull the
-/// ORIGINAL audio files off the card. No PLAUD consumer account involved,
-/// so a phone-number account works fine here.
-///
-/// **Cloud sync (secondary, compatibility)** — sign in with an EMAIL-based
-/// consumer account and download what the official app uploaded. Kept for
-/// users who don't want to unbind from the official app.
-///
-/// Entry point: the ADD-DEVICE flow (ScannerSheet row → this sheet), per
-/// user feedback — not the device page bottom and not Settings. The former
-/// `PlaudSettingsView` wrapper was folded into `PlaudAddSheet`.
 struct PlaudAddSheet: View {
     @ObservedObject private var direct = PlaudDirectService.shared
     @ObservedObject private var plaud = PlaudCloudService.shared
@@ -92,10 +77,6 @@ struct DirectConnectSection: View {
         }
     }
 
-    /// ★ Recording mode (2026-10-22: "官方 App 的几个模式搬过来") — the card's
-    /// `BatteryMode` common setting: 高性能 / 自适应 / 长续航. Values and copy
-    /// mirror the official app's 电池电量 page; the hour estimates are the
-    /// official figures for high performance (linear 0.3 h per battery %).
     private var batteryModeSection: some View {
         Section {
             if direct.batteryModeUnsupported {
@@ -246,8 +227,6 @@ struct DirectConnectSection: View {
         }
     }
 
-    /// Battery / recording / firmware row set shown while connected —
-    /// parity with the official app's device panel.
     @ViewBuilder
     private func connectedControls(sn: String) -> some View {
         HStack(spacing: 10) {
@@ -360,8 +339,6 @@ struct DirectConnectSection: View {
                     HStack {
                         Text(L10n.Plaud.serialNumber)
                         Spacer()
-                        // Selectable: the SN is what you paste into a support
-                        // ticket or the official app's device list.
                         Text(sn)
                             .font(.footnote.monospaced())
                             .foregroundStyle(.secondary)
@@ -398,23 +375,6 @@ struct DirectConnectSection: View {
         }
     }
 
-    /// Hand the card back to PLAUD's own app (2026-10-21 8th round: "增加一个
-    /// 切换通过官方 app 绑定的按钮，会解绑卡片清除录音恢复出厂设置").
-    ///
-    /// Why one purpose-built exit instead of the old "factory reset" row: the BLE
-    /// work was already there, but it never said *why* you would want it, and the
-    /// user was left to discover on their own that a bound card is invisible to
-    /// the official app. So this button does the full hand-back — `depair(clear:)`
-    /// + cloud unbind + radio released — and then prints the three steps that
-    /// actually decide whether the official app can pair (quit Nomily, forget the
-    /// OS-level pairing, then pair). "Unbind but keep recordings" stays as the
-    /// non-destructive variant, and deactivate stays as the local-only reset.
-    /// What the CARD actually answered to the hand-back — never a guess.
-    ///
-    /// ★ 2026-10-27 ("点击交还官方 App 没效果"): the old UI printed "已交还"
-    /// the moment the row was tapped, so a release the card never received
-    /// looked like a success and the next launch silently re-bound the card.
-    /// Three honest states now, each with the one action that unblocks it.
     @ViewBuilder
     private var releaseResultNote: some View {
         if let outcome = direct.releaseOutcome {
@@ -444,9 +404,6 @@ struct DirectConnectSection: View {
     private var handoverSection: some View {
         Section {
             Button(L10n.Plaud.handover) {
-                // Enabled even while disconnected: the common case is "the card
-                // is asleep and the official app won't pair", and a greyed-out
-                // row there explains nothing. Say what is missing instead.
                 if direct.phase.isConnected {
                     showHandoverConfirm = true
                 } else {
@@ -582,8 +539,6 @@ struct DirectConnectSection: View {
                 clientId: clientId, secret: clientSecret,
                 domain: PlaudDirectService.defaultDomain
             )
-            // A card picked before activation now proceeds automatically —
-            // the official app behaves the same way (select → key → connect).
             direct.connectSelected()
             editingKeys = false
         } catch {
@@ -1526,17 +1481,6 @@ struct FindCardSection: View {
 
 // MARK: - Cloud mode
 
-/// **云模式** — the second way to get recordings off a PLAUD card: sign in with
-/// the PLAUD consumer account (email OTP) and pull what the official app has
-/// already uploaded.
-///
-/// Why it exists next to direct connect (user: "直连模式下面要增加一个云模式"):
-/// · Direct connect reads the card itself — no account, no internet, but the
-///   card must be awake and paired with THIS app (the official app loses access).
-/// · Cloud mode touches no Bluetooth at all: the card keeps working with the
-///   official app, and whatever that app already synced can be fetched here.
-///   The trade-off is freshness — a recording only exists in the cloud after the
-///   official app uploaded it.
 struct CloudSyncSection: View {
     @ObservedObject var plaud: PlaudCloudService
     @State private var email = ""

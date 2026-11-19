@@ -300,14 +300,14 @@ final class SoundcoreLink: NSObject, RecorderLink {
         keepAliveTask = nil
     }
 
-    // MARK: in-app mark（App 内打点，镜像 `DingTalkA1Link.addMarkNow`）
+    // MARK: In-app recording marker
 
     /// 实时转录期间由 App 打一个点。offset 锚定最近收到的切片（20 ms/片）。
     @discardableResult
     func addMarkNow() -> Bool {
         guard !liveStopping, let fid = client.activeRealtimeFileId ?? liveFileId else { return false }
         let offset = max(0, Double(liveLastSeq + 1) * 0.02)
-        A1MarkStore.add(A1Mark(offset: offset, at: Date()), toFile: fid)
+        RecorderMarkStore.add(RecorderMark(offset: offset, at: Date()), toFile: fid)
         TicNoteDiagLog.log("D3200 MARK", "＋ app mark \(String(format: "%.0f", offset))s (seq \(liveLastSeq))")
         return true
     }
@@ -321,7 +321,7 @@ final class SoundcoreLink: NSObject, RecorderLink {
 //
 // 音频桥：`SoundcoreClient.onRealtimeFrame`（解密后的整包 160 B）→ AsyncThrowingStream
 // → LiveModel → ASR。三件事也挂在这条桥上：
-//   ① 打标（flags bit0）→ `A1MarkStore`，offset = seq × 20 ms；
+//   ① Mark events are stored by `RecorderMarkStore`.
 //   ② 设备自己结束（0x1A/0x0A done）→ 流正常收尾（LiveModel 按"设备停止"分支处理）；
 //   ③ 看门狗：首帧超时 / 掉线 / 长时间静音且设备未在录音 → 提前报错收尾。
 extension SoundcoreLink: LiveAudioSource {
@@ -459,7 +459,7 @@ extension SoundcoreLink: LiveAudioSource {
         client.onRealtimeMark = { [weak self] fid, seq in
             guard let self else { return }
             let offset = max(0, Double(seq) * 0.02)
-            A1MarkStore.add(A1Mark(offset: offset, at: Date()), toFile: fid)
+            RecorderMarkStore.add(RecorderMark(offset: offset, at: Date()), toFile: fid)
             TicNoteDiagLog.log("D3200 MARK", "＋ \(String(format: "%.0f", offset))s (seq \(seq))")
         }
         // 桥 ③：设备自己结束了这段（0x1A/0x0A done）——流正常收尾。
@@ -594,7 +594,7 @@ extension SoundcoreLink: LiveAudioSource {
             throw RecorderLinkError.malformed("Ogg muxing failed (\(raw.count) B)")
         }
         if let fid = liveFileId {
-            A1MarkStore.writeSidecar(fid: fid, clipBase: (name as NSString).deletingPathExtension)
+            RecorderMarkStore.writeSidecar(fid: fid, clipBase: (name as NSString).deletingPathExtension)
         }
         return ogg
     }

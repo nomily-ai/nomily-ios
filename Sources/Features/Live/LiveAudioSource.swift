@@ -116,7 +116,7 @@ protocol LiveAudioSource: AnyObject {
     ///   statically — every device would silently get the `nil` behaviour forever.
     ///
     /// Why it exists: the screen used to derive the timer from the packets *we* received, so the
-    /// moment the card stopped pushing (a known A1 behaviour, see `DingTalkA1Link.liveTask`) the
+    /// moment the card stopped pushing audio packets, the
     /// clock froze while the card kept counting on its own — "the number is stuck / doesn't match
     /// DingTalk". The card reports its own duration in `0x0132`; that is the number to show.
     ///

@@ -1,21 +1,5 @@
 import SwiftUI
 
-/// The PLAUD-style recording stage: a dark card that slides up when a take
-/// starts and keeps the live transcript front and centre.
-///
-/// ## Why a separate stage instead of the 实时 tab
-/// The official app treats recording as its own place: you press record, a
-/// dark panel takes over, the clock and the words are the only things on
-/// screen, and stopping drops you back. The 实时 tab was doing that job with a
-/// header, a toolbar and a grouped background — fine as a page, wrong as a
-/// stage. This view is that stage: one card, one clock, one transcript, three
-/// controls.
-///
-/// ## What it reads from
-/// Everything is `PlaudDirectService` state — `isRecording` / `isPaused`,
-/// `liveSegments` (finals) + `livePartial` (the in-flight hypothesis),
-/// `liveLevel` (0–1 loudness) and the card's own clock via `elapsedText`. The
-/// stage owns no audio logic, so it cannot drift from the recording it shows.
 struct PlaudRecordingStage: View {
     @ObservedObject private var direct = PlaudDirectService.shared
     @Environment(\.dismiss) private var dismiss

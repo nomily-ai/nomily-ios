@@ -293,13 +293,6 @@ final class WebDAVSyncService: ObservableObject {
         return f
     }()
 
-    /// 录音名里嵌的时间戳 → 录制日期。支持两种形状：
-    ///   · 纯 14 位开头：`20261014161945` → 2026-10-14；
-    ///   · 设备前缀名：`ticnote_20261023-135413_6ADAF685`、`dingtalk-a1_20261018-220449_…`、
-    ///     `Phone-20261102125818` —— 名字中间有 `yyyyMMdd` 或 `yyyyMMdd-HHmmss`。
-    ///     ★ 2026-11-03：之前只看前 14 位，前缀名全部回落到 .txt 的 mtime，
-    ///     用户实测同一批文件夹的日期每次重新转写都会漂（如 10-23 的录音
-    ///     显示成 2026-11-03）。
     private static let embeddedStampRegex = try! NSRegularExpression(pattern: "(\\d{8}-?\\d{6})")
 
     private static func recordedDate(base: String, in dir: URL) -> Date {

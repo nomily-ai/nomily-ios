@@ -213,8 +213,6 @@ enum L10n {
                               comment: "Opens the last-seen coordinate in Apple Maps")
         }
         static var thisCard: String {
-            // Was "your PLAUD card". The finder now serves every recorder, so a
-            // TicNote user must not be told their DingTalk A1 is a PLAUD card.
             NSLocalizedString("find.this_card", value: "your card",
                               comment: "Fallback card name in the drop notification")
         }
@@ -438,9 +436,6 @@ enum L10n {
         static var factoryResetMsg: String { NSLocalizedString("plaud.factory_reset_msg", value: "All recordings on the card will be erased and the binding released — the card becomes like new. This cannot be undone.", comment: "") }
         static var erase: String { NSLocalizedString("plaud.erase", value: "Erase", comment: "") }
         static var released: String { NSLocalizedString("plaud.released", value: "Card released — the official PLAUD app can pair it again.", comment: "") }
-        // ★ 2026-10-21 (8th round): one purpose-built exit — "switching back to
-        // the official app" is unbind + erase + the three steps nobody guesses
-        // (quit Nomily, forget the OS pairing, then pair in the official app).
         static var handoverHeader: String { NSLocalizedString("plaud.handover_header", value: "Switch back to the official app", comment: "Section header for handing the card back to PLAUD's own app") }
         static var handover: String { NSLocalizedString("plaud.handover", value: "Hand back to the official app (unbind + erase card)", comment: "Hands the card back: releases our binding and wipes the card") }
         static var handoverConfirmTitle: String { NSLocalizedString("plaud.handover_confirm_title", value: "Hand the card back to the official app?", comment: "") }
@@ -904,236 +899,6 @@ enum L10n {
         }
     }
 
-    // MARK: - DingTalk A1 credential import
-
-    /// Copy for `DingTalkA1SetupView`.
-    ///
-    /// Every string here explains a step that **cannot** be automated away, so the wording is
-    /// deliberately plain: "one secret per card, here is how you get it, here is what it does
-    /// not do". Vague copy at this point reads as a request to trust a black box.
-    enum A1 {
-        static var title: String {
-            NSLocalizedString("a1.title", value: "DingTalk A1", comment: "A1 credential page title")
-        }
-        static var intro: String {
-            NSLocalizedString(
-                "a1.intro",
-                value: "Every DingTalk A1 has its own device secret. DingTalk issues it when the card is bound to an account; it can't be derived from the serial number and it is never sent over Bluetooth. So the first time, it has to be taken out of one signed-in DingTalk session — after that, listing, downloading and transcribing all happen offline, with no DingTalk involved.",
-                comment: "A1 credential page intro"
-            )
-        }
-        static var step1Title: String {
-            NSLocalizedString("a1.step1.title", value: "Bind the card to your DingTalk account",
-                              comment: "A1 setup step 1 title")
-        }
-        static var step1Body: String {
-            NSLocalizedString(
-                "a1.step1.body",
-                value: "Bought it second-hand? Ask the seller to unbind it first, then scan the code in DingTalk to bind it yourself. Only you can do this step — it decides which account the card hands its secret to.",
-                comment: "A1 setup step 1 body"
-            )
-        }
-        static var step2Title: String {
-            NSLocalizedString("a1.step2.title", value: "Open “AI Notes” once on the desktop app",
-                              comment: "A1 setup step 2 title")
-        }
-        static var step2Body: String {
-            NSLocalizedString(
-                "a1.step2.body",
-                value: "Any template will do. DingTalk writes the device list — secret included — into its own log on that computer.",
-                comment: "A1 setup step 2 body"
-            )
-        }
-        static var pasteSection: String {
-            NSLocalizedString("a1.paste.section", value: "Paste the credential", comment: "")
-        }
-        static var pastePlaceholder: String {
-            NSLocalizedString("a1.paste.placeholder",
-                              value: "Paste what the command copied…", comment: "")
-        }
-        static var pasteFromClipboard: String {
-            NSLocalizedString("a1.paste.from_clipboard", value: "Paste", comment: "")
-        }
-        static var importAction: String {
-            NSLocalizedString("a1.import", value: "Import", comment: "")
-        }
-        static var pasteFooter: String {
-            NSLocalizedString(
-                "a1.paste.footer",
-                value: "Accepts the one-line form, the JSON the extractor writes, or key=value lines.",
-                comment: ""
-            )
-        }
-        static var importedHeader: String {
-            NSLocalizedString("a1.imported.header", value: "Imported", comment: "")
-        }
-        static var importedOK: String {
-            NSLocalizedString("a1.imported.ok", value: "Ready — reconnect the card to use it", comment: "")
-        }
-        static var cardName: String { NSLocalizedString("a1.card.name", value: "Card", comment: "") }
-        static var cardSN: String { NSLocalizedString("a1.card.sn", value: "Serial", comment: "") }
-        static var cardSecret: String {
-            NSLocalizedString("a1.card.secret", value: "Secret", comment: "")
-        }
-        static var cardsHeader: String {
-            NSLocalizedString("a1.cards.header", value: "Cards on this phone", comment: "")
-        }
-        static var cardsFooter: String {
-            NSLocalizedString(
-                "a1.cards.footer",
-                value: "The secret is kept in the iOS keychain only — never in the settings file, never uploaded anywhere. Swipe a card to remove it; the card itself is untouched.",
-                comment: ""
-            )
-        }
-        static var deleteTitle: String {
-            NSLocalizedString("a1.delete.title", value: "Remove this card's credential?", comment: "")
-        }
-        static var deleteMessage: String {
-            NSLocalizedString(
-                "a1.delete.message",
-                value: "Nomily will no longer be able to read this card. Recordings on the card are not affected.",
-                comment: ""
-            )
-        }
-        static var importFailed: String {
-            NSLocalizedString("a1.import_failed", value: "Couldn't import that", comment: "")
-        }
-
-        // MARK: QR / deep link
-
-        /// Button on the import page. A QR code removes the clipboard from the loop entirely,
-        /// which is where "paste it from your Mac" used to fall down.
-        static var scanAction: String {
-            NSLocalizedString("a1.scan.action", value: "Scan QR code", comment: "")
-        }
-        static var scanHint: String {
-            NSLocalizedString(
-                "a1.scan.hint",
-                value: "Point the camera at the QR code the command printed on your Mac.",
-                comment: ""
-            )
-        }
-        static var scanDenied: String {
-            NSLocalizedString(
-                "a1.scan.denied",
-                value: "Camera access is off for Nomily. Turn it on in Settings → Nomily AI → Camera, or paste the line instead.",
-                comment: ""
-            )
-        }
-        static var scanNoCamera: String {
-            NSLocalizedString("a1.scan.no_camera", value: "No camera available here.",
-                              comment: "")
-        }
-        static var scanFailed: String {
-            NSLocalizedString(
-                "a1.scan.failed",
-                value: "That QR code isn't a DingTalk A1 credential. Use the one printed by the extractor on your Mac.",
-                comment: ""
-            )
-        }
-        /// Shown when the app is opened from a scanned code / tapped link.
-        static var importedFromLink: String {
-            NSLocalizedString("a1.link.imported", value: "Credential imported",
-                              comment: "")
-        }
-        static func importedFromLinkBody(_ name: String) -> String {
-            String(format: NSLocalizedString("a1.link.imported_body",
-                                             value: "%@ is ready. Go back and tap “Try again”.",
-                                             comment: ""), name)
-        }
-
-        /// Row shown next to a failed read on an A1 device page — the way into this sheet
-        /// without hunting through Settings.
-        static var openImport: String {
-            NSLocalizedString("a1.open_import", value: "Import this card's key", comment: "A1 device page error CTA")
-        }
-
-        // MARK: Per-card credential section (device info page)
-
-        /// Header of the section on **one card's** device-info page.
-        static var sectionTitle: String {
-            NSLocalizedString("a1.section.title", value: "Card key", comment: "Per-card credential section header")
-        }
-        static var sectionFooter: String {
-            NSLocalizedString(
-                "a1.section.footer",
-                value: "This key belongs to this card alone — it is not an app-wide setting. Another A1 needs its own. It is stored in the iOS keychain and never leaves the phone.",
-                comment: "Per-card credential section footer"
-            )
-        }
-        static var missingTitle: String {
-            NSLocalizedString("a1.missing.title",
-                              value: "No key on this phone yet — the card can't be read until one is imported.",
-                              comment: "Per-card credential section, empty state")
-        }
-        static var replace: String {
-            NSLocalizedString("a1.replace", value: "Replace key", comment: "Re-import a card's secret")
-        }
-        static var remove: String {
-            NSLocalizedString("a1.remove", value: "Delete key", comment: "Remove this card's secret")
-        }
-        static var pasteManually: String {
-            NSLocalizedString("a1.paste.manually", value: "Paste it instead", comment: "Expands an inline paste box")
-        }
-        static var howTo: String {
-            NSLocalizedString("a1.how_to", value: "How do I get this key?", comment: "Opens the explainer page")
-        }
-        static func scopedTo(_ card: String) -> String {
-            String(format: NSLocalizedString("a1.scoped_to", value: "For %@ only",
-                                             comment: "Header line on the explainer, naming the card"), card)
-        }
-        /// Shown when the imported secret belongs to a different card than the one on screen.
-        static func mismatch(_ importedSN: String, _ expectedTail: String) -> String {
-            String(
-                format: NSLocalizedString(
-                    "a1.mismatch",
-                    value: "Saved, but its serial ends in %@ — this card's ends in %@. If you meant this card, import that card's own key.",
-                    comment: "Warning when the imported secret is for another card"
-                ),
-                importedSN, expectedTail
-            )
-        }
-
-        /// The error `DingTalkA1Link` throws when the card connects but no credential is on
-        /// file. Must name the exact place to go, because this string is all the user sees.
-        static var errorNoCredential: String {
-            NSLocalizedString(
-                "a1.error.no_credential",
-                value: "This card has no key on this phone yet. Open this card's info page → “Card key” to scan or paste it — a one-time step, after which everything runs offline.",
-                comment: "A1 missing-credential error"
-            )
-        }
-
-        /// `0x0133` answered 501 — the stored secret belongs to a different card.
-        static var errorRejected: String {
-            NSLocalizedString(
-                "a1.error.rejected",
-                value: "The card rejected the stored credential (501). Each card's secret works only on that card — import this card's own credential in Settings → DingTalk A1.",
-                comment: "A1 credential rejected error"
-            )
-        }
-
-        /// `0x0133` answered 405 — the card considers this session unauthenticated (usually a
-        /// stale link after the card rebooted or connected to something else).
-        static var errorNotAuthenticated: String {
-            NSLocalizedString(
-                "a1.error.not_authenticated",
-                value: "The card says this session isn't authenticated (405). Disconnect and reconnect the card, then try again.",
-                comment: "A1 session not authenticated error"
-            )
-        }
-
-        /// The stored secret can't mathematically produce a token (too short).
-        static var errorBadSecret: String {
-            NSLocalizedString(
-                "a1.error.bad_secret",
-                value: "The stored credential's secret is too short to produce a token. Re-import it in Settings → DingTalk A1.",
-                comment: "A1 malformed secret error"
-            )
-        }
-
-    }
-
     // MARK: - Language
 
     enum Language {
@@ -1195,7 +960,6 @@ enum L10n {
         }
     }
 
-    // MARK: - Social (★ 2026-10-29 用户反馈入口：X / 小红书)
 
     enum Social {
         static var xHomepage: String {
@@ -3001,8 +2765,6 @@ enum L10n {
         static func qualityTierLabel(_ base: String, _ sizePerHour: String, _ recommendation: String?) -> String {
             var s = "\(base) · \(sizePerHour)"
             if let recommendation {
-                // ★ 2026-11-05：括号样式本地化——英文用半角括号（用户截图里
-                // "约 29MB/小时（不建议）"整段混排就是这么来的另一半）。
                 s += String(format: NSLocalizedString("rec_settings.quality_rec_parens", value: "（%@）",
                                                       comment: "Quality picker: wraps the recommendation mark; %@ = e.g. not recommended"),
                             recommendation)
@@ -4827,18 +4589,6 @@ enum L10n {
                 comment: "Body of the unbind confirmation. Deliberately does not promise to erase recordings"
             )
         }
-        /// ★ (2026-10-20) A1-specific confirm body. The A1 protocol has no BLE unbind
-        /// command, so this action removes the card **from the app** (secret, alias,
-        /// ledger) and drops the link. The cloud binding inside the DingTalk account
-        /// can only be removed in the official DingTalk app — say so, or the user will
-        /// believe the card left their DingTalk account.
-        static var unbindConfirmMessageA1: String {
-            NSLocalizedString(
-                "ticnote.unbind_confirm_message_a1",
-                value: "This removes the card from Nomily — its key, name and ledger entry — and disconnects it. The card keeps its recordings, and the binding inside your DingTalk account can only be removed in the official DingTalk app.",
-                comment: "Body of the unbind confirmation for the DingTalk A1 card"
-            )
-        }
         static var unbindConfirmAction: String {
             NSLocalizedString("ticnote.unbind_confirm_action", value: "Unbind", comment: "Confirm button in the unbind alert")
         }
@@ -5720,7 +5470,6 @@ enum L10n {
         static var pickHint: String { NSLocalizedString("scanner.pick_hint", value: "Pick a device type, then scan for it", comment: "Hint on the device-type pick page") }
         static var categoryVobot: String { NSLocalizedString("scanner.category_vobot", value: "V05E", comment: "Device family card") }
         static var categoryTicnote: String { NSLocalizedString("scanner.category_ticnote", value: "TicNote", comment: "Device family card") }
-        static var categoryA1: String { NSLocalizedString("scanner.category_a1", value: "DingTalk A1", comment: "Device family card") }
         static var categoryPlaud: String { NSLocalizedString("scanner.category_plaud", value: "PLAUD", comment: "Device family card") }
         static var categoryWatch: String { NSLocalizedString("scanner.category_watch", value: "Apple Watch", comment: "Device family card") }
         static var actionScan: String { NSLocalizedString("scanner.action_scan", value: "Scan to connect", comment: "Card subtitle: BLE scan flow") }

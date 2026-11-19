@@ -91,8 +91,6 @@ struct NomilyApp: App {
 private struct LocalizedRoot: View {
     @EnvironmentObject private var localization: LocalizationService
 
-    @State private var linkNotice: String?
-    @State private var linkNoticeTitle: String?
     /// ★ (2026-10-19) Branded splash: the system launch screen is a bare red page; the logo
     /// now stays on it for a beat before the app is revealed. Purely presentational — the
     /// root is laid out underneath from the first frame, so nothing is blocked.
@@ -126,34 +124,8 @@ private struct LocalizedRoot: View {
                     DemoContent.apply(language: language)
                 }.value
             }
-            // ★ `nomily-a1://import/…` — how a QR code scanned with the system Camera app (or
-            // a tapped link in a chat) becomes a stored credential. The in-app scanner calls
-            // the same parser; this is only the "already outside the app" entry point.
-            //
-            // Registering the scheme is worth it even with the scanner available: a code read
-            // by the Camera app needs *some* handler, and without one iOS shows a dead URL.
-            .onOpenURL { url in handleIncoming(url) }
-            .alert(linkNoticeTitle ?? "", isPresented: Binding(
-                get: { linkNotice != nil },
-                set: { if !$0 { linkNotice = nil; linkNoticeTitle = nil } }
-            )) {
-                Button(L10n.Common.ok, role: .cancel) { linkNotice = nil; linkNoticeTitle = nil }
-            } message: {
-                Text(linkNotice ?? "")
-            }
     }
 
-    private func handleIncoming(_ url: URL) {
-        linkNoticeTitle = L10n.A1.importedFromLink
-        do {
-            let credential = try DingTalkA1Credential.parse(link: url)
-            DingTalkA1CredentialStore.save(credential)
-            linkNotice = L10n.A1.importedFromLinkBody(credential.displayName)
-        } catch {
-            linkNoticeTitle = L10n.A1.importFailed
-            linkNotice = L10n.A1.scanFailed
-        }
-    }
 }
 
 /// The one-second branded splash: same red as the launch screen, the app mark floating

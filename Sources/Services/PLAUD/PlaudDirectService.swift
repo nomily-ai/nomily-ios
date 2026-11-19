@@ -5,43 +5,6 @@ import PlaudBleSDK
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "plaud.direct")
 
-/// PLAUD **direct connect** (SDK takeover mode) — the primary PLAUD experience.
-///
-/// Mirrors the other recorder cards (A1 / D·NOTE): Bluetooth scan → connect →
-/// pull the ORIGINAL audio files off the card. No PLAUD consumer account is
-/// involved (neither phone-number nor email); the only credential is the
-/// developer Client ID + Client Secret from dev.plaud.ai, used to mint a
-/// short-lived User Access Token that the official SDK wants at init.
-///
-/// ## Verified auth chain (2026-10-21, curl against platform-us.plaud.ai)
-///   1. `POST /developer/api/oauth/partner/access-token`
-///      `Authorization: Basic base64(client_id:secret)`, body `{}` → partner token (~1h)
-///   2. `POST /developer/api/open/partner/users/access-token`
-///      `Authorization: Bearer <partner>`, `{"user_id":"..."}` → user JWT (600 s!)
-///
-/// ⚠️ The user token lives only 600 s, so it is re-minted on every
-/// activate/scan instead of being persisted. The handshake identity the
-/// device binds to is derived from the JWT `sub`, which is DETERMINISTIC for
-/// a given (client_id, user_id) — re-minting never re-binds the card.
-/// The user_id itself is therefore a stable per-install random string.
-///
-/// ## First takeover
-/// The card firmware is single-binding: while the official app owns it, our
-/// handshake is rejected (status 255 / drop before handshake). The user must
-/// unbind once in the official PLAUD app; recordings stay on the card.
-///
-/// ## File flow
-/// connect → `getFileList` → queue `exportAudio(.mp3)` per session (dedup by
-/// sessionId) → move into `StorageLocations.decryptedDir` under a
-/// timestamped name → `LibraryItem.readFromDisk` via the `.libraryDidChange`
-/// notification, i.e. the same landing path as every other recorder.
-/// mp3 (not opus) because AVPlayer cannot play ogg/opus, matching the
-/// official template's reasoning.
-///
-/// Deliberately NOT used here: WiFi fast transfer, iBeacon wake-up, firmware
-/// OTA — the SDK supports them but the first cut keeps the surface small.
-/// Threading: the SDK calls back on arbitrary queues, so @Published writes
-/// are marshalled to the main queue explicitly (template app does the same).
 final class PlaudDirectService: NSObject, ObservableObject {
     static let shared = PlaudDirectService()
 
@@ -294,10 +257,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
     /// different claims. Same rule as the A1 `sizeBytes` trap: never let an
     /// unknown masquerade as a measurement.
     @Published private(set) var cardFileCount: Int?
-    /// ★ 2026-10-27 ("点击交还官方 App 没效果"): the last hand-back's real
-    /// outcome. The UI used to print "已交还" the instant the button was
-    /// tapped, whatever the card answered — this is the honest replacement.
-    /// `nil` = no hand-back attempted in this session.
     enum ReleaseOutcome: Equatable {
         /// The card acked `bleDepair` with status 0 — it really is released.
         case acked
@@ -319,8 +278,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
     /// unconfirmed release the card is still `pairedSN`, and the launch-time
     /// keeper would re-bind it within seconds.
     @Published private(set) var handoverHold = UserDefaults.standard.bool(forKey: "plaud.handover_hold")
-    /// The card the user tapped in the scan list (before credentials exist —
-    /// the official app shows cards + SN first, key comes after).
     @Published private(set) var selectedCard: ScannedCard?
     @Published var deleteAfterSync: Bool {
         didSet { UserDefaults.standard.set(deleteAfterSync, forKey: "plaud.delete_after_sync") }
@@ -459,13 +416,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
     /// Set once the card ever answers `getMarking`. When false the UI says the
     /// count arrives after the recording instead of showing a permanent "—".
     @Published private(set) var marksAvailableLive = true
-    // ★ Recording mode (2026-10-22, user: "把官方 App 的几个模式搬过来"): the
-    // official app's 电池电量 page — 高性能 / 自适应 / 长续航 — is the card's
-    // `BatteryMode` common setting, read/written on the LOW-level BleAgent
-    // (`readBatteryMode` / `setBatteryMode(value:)`); the high-level agent
-    // exposes nothing for it. Value semantics (inferred, cross-check pending):
-    // 0 = high performance, 1 = adaptive, 2 = long endurance — the official
-    // page ships with high performance selected and lists them in that order.
     @Published private(set) var batteryMode: Int?
     @Published private(set) var batteryModeUnsupported = false
     /// ★ Read-back is unavailable: the high-level agent handles the BatteryMode
@@ -499,15 +449,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
     private var reconnectTarget: String?
     /// Bounded wait behind `switchNote` (see `switchCard(to:)`).
     private var switchWatchdog: Task<Void, Never>?
-    // MARK: Device Recovery (docs.plaud.ai "Recovering a Plaud device")
-    /// ★ 2026-10-21 (9th round): a card whose cloud and local bind state went
-    /// out-of-sync locks EVERY app out — our normal handshake no longer matches
-    /// the on-device lock ("Nomily 无法匹配") and the official app has no key
-    /// at all ("官方 App 加不上"). The documented escape is a recovery connect:
-    /// re-handshake with each **previously bound client ID** using force-clear
-    /// until one matches the lock; the stale lock is wiped and the card can be
-    /// bound again — by us (then depair(clear:true) hands it to another app)
-    /// or directly by the official app.
     private var recoveryMode = false
     private var recoveryIndex = 0
     private var recoveryDevice: BleDevice?
@@ -1117,13 +1058,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
         return alias.isEmpty ? modelName(for: sn) : alias
     }
 
-    /// Rename the card. Empty input falls back to the product name.
-    ///
-    /// Why a rename lives on the phone and not on the card: the SDK's
-    /// `setDeviceName` writes the BLE advertising name, which is shared by every
-    /// phone that ever pairs with it — and a wrong name there would break
-    /// reconnection for the official app too. A local alias is the reversible
-    /// choice, and it is what the other cards do as well.
     func rename(to newName: String) {
         let sn: String
         if let paired = pairedSN {
@@ -1465,9 +1399,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
             bleDevice: ble, historicalUserId: ids[index])
     }
 
-    /// Recovery handshake succeeded: the stale lock is gone and the card is
-    /// bound to us — immediately wipe it (lock + recordings) and drop the link,
-    /// leaving factory state for the official app.
     private func finishRecovery(sn: String) {
         recoveryMode = false
         log.info("plaud recovery succeeded for \(sn, privacy: .public) — wiping card")
@@ -1822,23 +1753,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
         PlaudDeviceAgent.shared.stopRecord()
     }
 
-    /// Pause / resume (the SDK exposes both; official app has pause).
-    ///
-    /// ★ 2026-10-22 ("暂停后点击继续无法继续录音"): the button used to be a bare
-    /// fire-and-forget `resumeRecord()`. Three things were missing, and each one
-    /// alone is enough to make "继续" look dead:
-    ///
-    /// 1. **No ack tracking.**  CMD 140 (resume) is answered by
-    ///    `bleRecordResume`; if the card refuses (busy, mode switched, session
-    ///    already closed) nothing on screen changed and the button stayed on
-    ///    "继续" — indistinguishable from a lost tap.
-    /// 2. **The sync pipe was never reopened.**  Opening the live channel is what
-    ///    makes the card push PCM, and a pause tears that channel down. Resuming
-    ///    recording without re-issuing CMD 28 gives a take that is running on the
-    ///    card while the app hears silence — "no text again", for a new reason.
-    /// 3. **The ASR session had been left for dead.**  Azure closes an idle
-    ///    websocket, so a pause longer than ~20 s leaves nothing to feed when the
-    ///    audio comes back.
     func pauseRecording() {
         guard isRecording else { return }
         TicNoteDiagLog.log("PLAUD-REC", "pause requested sid=\(recordSessionID ?? -1)")
@@ -2328,13 +2242,6 @@ final class PlaudDirectService: NSObject, ObservableObject {
         Task { @MainActor in self.stopLiveTranscription() }
         pendingRelease = (factoryReset, sn)
         PlaudDeviceAgent.shared.depair(clear: factoryReset)
-        // ★★ 2026-10-27 ("点击交还官方 App 没效果" — root cause): this used to
-        // call `disconnect()` on the very next line. `depair` is an async BLE
-        // command, so dropping the link immediately killed it before it left
-        // the radio: the card stayed bound, the app forgot it, and the next
-        // launch simply re-bound it again (diag 10:48:34 / 10:52:39 "PLAUD
-        // bound 8810A30346423315" after three launches). Now we wait for the
-        // card's own `bleDepair` answer and only then release the radio.
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.pendingRelease != nil else { return }
             TicNoteDiagLog.log("PLAUD-REC", "release: no depair ack within \(Int(Self.releaseAckTimeout))s")
@@ -3012,10 +2919,6 @@ extension PlaudDirectService: PlaudDeviceAgentProtocol {
             // Auto-pull: a card that just connected with recordings on it should
             // start transferring them without a tap (2026-10-21 request).
             autoPullNewRecordings()
-            // Honour a "record now" tap that arrived while the card was asleep.
-            // A short beat, because `startRecord` right on top of the bind
-            // handshake gets refused by the card (it is still reading its own
-            // storage); 0.6 s matches the gap the official app leaves.
             if pendingStartAfterConnect {
                 pendingStartAfterConnect = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -3027,14 +2930,6 @@ extension PlaudDirectService: PlaudDeviceAgentProtocol {
         }
     }
 
-    /// @required — recorder state push.
-    ///
-    /// ⚠️ **`state == 1` is IDLE** (verified on hardware 2026-10-21): the card
-    /// answers every 3 s poll with `state 1, privacy 1, key 0` while it is doing
-    /// nothing, so treating 1 as "recording" made the app claim a recording that
-    /// never happened — the clock even ticked, because we then opened a sync-file
-    /// channel on a stale session. Recording is the high-bit value (4099) that the
-    /// official app's state dump showed.
     func blePenState(state: Int, privacy: Int, keyState: Int, uDisk: Int, findMyToken: Int, hasSndpKey: Int, deviceAccessToken: Int) {
         log.info("plaud pen state \(state) privacy \(privacy) key \(keyState) udisk \(uDisk)")
         // ★ Remember the raw state: `armRecordStateWatchdog` reconciles against
@@ -3811,10 +3706,6 @@ extension PlaudDirectService: PlaudDeviceAgentProtocol {
         }
     }
 
-    /// ★ 2026-10-26: the official hardware-mark channel. The official app polls
-    /// `getRecordTagsLastMinute` while recording (RE: `RecordTagsManager`); this
-    /// SDK exposes the same call as `getRecordMarkingTags` and answers here —
-    /// with **exact timestamps**, not a count to be stamped "when noticed".
     func bleGetRecordMarkingTags(uid: Int, totals: Int, index: Int, tags: [BleRecordMarkingTag]) {
         let head = tags.prefix(8).map { "\($0.timestamp)/t\($0.type)/s\($0.status)" }
                       .joined(separator: ",")

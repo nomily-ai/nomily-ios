@@ -58,8 +58,6 @@ struct WebDAVSetupSheet: View {
                             WebDAVView(initialPreset: item.label)
                         } label: {
                             HStack(spacing: 12) {
-                                // ★ 2026-10-30：有官方 App 图标就用真图标（App Store
-                                //   抓的原 图，圆角由这里裁）；没品牌的回退 SF Symbol。
                                 if let appIcon = item.appIcon {
                                     Image(appIcon)
                                         .resizable()
@@ -463,9 +461,6 @@ struct WebDAVView: View {
     // MARK: - Load / save
 
     private func load() {
-        // ★ 2026-11-09 多账户：编辑模式从指定账户读，新建模式**从空白开始**
-        //   （只按预设预填端口/HTTPS/目录）——不能再回落读 `config.webdav`，
-        //   否则"添加极空间"进去看到的还是 NC 的主机和账号（用户实测反馈）。
         let cfg: WebDAVConfig?
         if let accountID,
            let account = configService.config.webdavAccounts?.first(where: { $0.id == accountID }) {

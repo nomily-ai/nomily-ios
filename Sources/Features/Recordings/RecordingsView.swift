@@ -429,10 +429,6 @@ private struct DeviceFilesView: View {
                         }
                     )
                 } else if keyHealth.state.isMismatch {
-                    // ★ 2026-11-04：有钥匙，但跟设备对不上（多半是官方 App 设的）。
-                    // 这种状态以前完全看不见，用户只在"传完了却打不开"时才发现。
-                    // 与上面那条互斥：`needsPassphraseOnboarding` 说的是"没钥匙"，
-                    // 这条说的是"有钥匙但不是这把"，同时显示只会让人更糊涂。
                     PassphraseOnboardingBanner(
                         recordingsAtRisk: model.files.count,
                         onOpenSettings: {

@@ -107,7 +107,7 @@ enum SummaryFacts {
     /// - Returns: 没有标记、或转写没有时间轴（没法定位）时为 `nil`。
     static func marksBlock(clipName: String) -> String? {
         let base = (clipName as NSString).deletingPathExtension
-        let marks = A1MarkStore.sidecar(forClipBase: base)
+        let marks = RecorderMarkStore.sidecar(forClipBase: base)
         guard !marks.isEmpty else { return nil }
         guard let doc = TranscriptDocument.load(for: clipName), !doc.segments.isEmpty else { return nil }
 

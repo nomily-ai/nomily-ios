@@ -463,25 +463,6 @@ struct SoundcoreDeviceInfo {
     }
 }
 
-/// One entry of the device-side recording list.
-///
-/// ## ★ 2026-10-28（8.3.6 反编译复核，`obf/i.java` AudioTransportImp）
-///
-/// 列表条目第三个 u32 **不是字节数，是时长毫秒**（之前 `PROTOCOL.md` §6.2/6.3
-/// 写成 size 是错的）。官方拿到后：
-///
-/// ```java
-/// int durRaw = u32(i + 8);                    // 时长毫秒
-/// new FileInfoModel(fileId, endTime,
-///         durRaw / 20 * 166,   // ← 第 3 参"size" = 估算字节数，只做进度条分母
-///         durRaw,              // ← 第 4 参 duration = 毫秒原值
-///         0);
-/// ```
-///
-/// 所以：`durationMs` 直接照抄报文；字节数只能**估**（duration × 8.3 ≈ 官方口径），
-/// 真字节数在 `1A 07` 文件头里（`u32 @13`，拉取时覆盖）。时长显示 / 归并一次录音
-/// 的多分段，都以 `durationMs` 为准（官方 `HardwareFileSyncManager` 按
-/// `fileId(n) − endTime(n−1) ≤ tolerance` 归并、总时长 = 各段之和）。
 struct SoundcoreFileEntry: Equatable {
     let fileId: UInt32
     /// 报文第三个 u32 —— **时长毫秒**（历史名 sizeBytes 已废弃）。
@@ -516,8 +497,6 @@ struct SoundcoreFileList {
         let count = soundcoreReadU16Le(b, 0)
         var o = 2
         var files: [SoundcoreFileEntry] = []
-        // 1B 0E：fileId + endTime + durationMs（12B）；1A 0E：fileId + durationMs（8B）。
-        // ★ 第三个字段是**时长毫秒**不是字节数（8.3.6 反编译复核，见 SoundcoreFileEntry）。
         let entrySize = withEndTime ? 12 : 8
         for _ in 0..<count {
             guard o + entrySize <= b.count else { break }

@@ -517,11 +517,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         linkLost = false
     }
 
-    /// ★ 2026-11-05（用户截图：睡眠模式下"无法开始录音: AVAudioRecorder refused to
-    /// start … RecorderError 0"）：睡眠专注/腕放下时，watchOS 会拒绝激活音频会话
-    /// 或拒绝 `record()`——这不是权限坏了，是系统在省电，**抬腕唤醒后通常就放行**。
-    /// 所以开录不再一失败就报错收场，而是按这条梯子重试（全程 ≈30s）；
-    /// 期间录音键保持"未在录"状态，用户随时可以再按（再按会重置梯子重新走）。
     private static let startRetryDelays: [TimeInterval] = [0.5, 1.0, 2.0, 4.0, 8.0, 15.0]
     private var startAttempt = 0
     private var startRetryTask: Task<Void, Never>?
@@ -724,14 +719,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         pushState()
     }
 
-    /// ★ 2026-11-03 八轮：在当前时间点打一个「重点」。
-    ///
-    /// 交互（用户原话："手表下方…按一下就可以标记重点打点"）：录音中，页面底部那颗
-    /// 旗标胶囊按一下 → 记下 `elapsed` + 一次 "click" 触感。**不打断录音、不弹窗**：
-    /// 打点的场景就是"正在听、来不及停下来说话"，任何需要确认的交互都不合格。
-    ///
-    /// ⚠️ 同一秒内连点只记一个：手表的触感反馈有延迟，用户会怀疑"是不是没点到"再点一次，
-    ///    那一下不该变成两个重点。
     func addBookmark() {
         guard isRecording else { return }
         if let last = marks.last, elapsed - last < 1.0 { return }
@@ -782,10 +769,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
         }
     }
 
-    /// 用户主动停（录音键 / 长按 / 手势确认条）。全天候开着时它的语义就是
-    /// **关掉全天候开关**（用户原话见 `stop()` 注释）——先翻开关、再走同一条
-    /// `stop()`；此刻偏好已是 false，`stop()` 末尾的自动续录不会触发。
-    /// 偏好变化随 `finishTake` 的 `pushState` 回报手机（每次心跳都带 allDay 键）。
     func stopByUser() {
         if WatchRecordingPrefs.shared.allDayRecording {
             WatchRecordingPrefs.shared.allDayRecording = false
@@ -902,13 +885,6 @@ final class WatchRecorderModel: NSObject, ObservableObject {
 
     // MARK: - 中断待续（★ 2026-11-05 全天候录音）
 
-    /// 上一场录音**不是被用户按停**、而是系统放弃（打断重试全败 / 看门狗放弃 /
-    /// media services reset / 分段轮转失败）时置位并持久化。App 被杀重启也能弹。
-    ///
-    /// 用户原话："只要不是用户手动点击结束录音的按下键则需要持续录音…中断下次
-    /// 唤醒 Nomily AI APP 手表也要继续录音，中断则弹窗继续。" 持续录音的部分由
-    /// 打断重试梯子 + 看门狗承担（上面两段）；这里是最后兜底——系统坚决不放的
-    /// 那些场景，抬腕回前台时**弹窗问一句要不要接着录**（只在全天候开关开着时弹）。
     private static let resumePendingKey = "watch.take.resume_pending.v1"
     private var resumePending: Bool {
         get { UserDefaults.standard.bool(forKey: Self.resumePendingKey) }

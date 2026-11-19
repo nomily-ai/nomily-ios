@@ -56,8 +56,7 @@ final class LiveModel: ObservableObject {
     @Published var frames = 0
     /// The card's own recording clock, in seconds — refreshed every few seconds while running.
     ///
-    /// ★ (2026-10-19) The screen used to trust `frames` alone. When the A1 stops pushing (it does,
-    ///   see `DingTalkA1Link.liveTask`) the frame count stops advancing and the timer freezes at
+    /// The screen used to trust `frames` alone. When a recorder stops pushing, the frame count stops advancing and the timer freezes at
     ///   whatever we last received — "the number is stuck / doesn't match DingTalk". The card
     ///   keeps counting regardless and reports it in `0x0132`, so we adopt that number.
     @Published var deviceElapsed: TimeInterval?
@@ -327,7 +326,7 @@ final class LiveModel: ObservableObject {
     /// Asked again for "the source that can reach this device **now**".
     ///
     /// ★ A recorder link object does not survive a BLE drop: `BluetoothCoordinator` throws the
-    ///   old `DingTalkA1Link` away (`recorderLink = nil`) and builds a **new** one after it
+    ///   old recorder link away (`recorderLink = nil`) and builds a **new** one after it
     ///   reconnects, so the instance captured at `start` is dead forever. Without this hook the
     ///   only possible reaction to a hiccup was "end the session". `LiveView` hands in
     ///   `{ liveSource }`, which always reads the current link.
@@ -465,7 +464,6 @@ final class LiveModel: ObservableObject {
     /// sidecar and a detail-page section; other devices return false and the button isn't shown at all.
     @discardableResult
     func addAppMark() -> Bool {
-        if let a1 = activeSource as? DingTalkA1Link { return a1.addMarkNow() }
         if let bean = activeSource as? SoundcoreLink { return bean.addMarkNow() }
         return false
     }
@@ -999,27 +997,6 @@ final class LiveModel: ObservableObject {
         let azureUsable = !(azure?.key.isEmpty ?? true) && !(azure?.region.isEmpty ?? true)
         diagLive("openASR wantTranslate=\(wantTranslation) azureUsable=\(azureUsable) src=\(sourceLang) tgt=\(targetLang ?? "-") profile=\(opusProfile.packetBytes)B")
 
-        // ★ (2026-10-20) This branch is gated on the "azuretranslate" kind, not just
-        //    azureUsable. Without that check a dead translation link (e.g. target
-        //    language `lzh`, which Azure Speech translation rejects by closing the
-        //    stream) re-entered this branch on every reconnect — an infinite ~1 Hz
-        //    loop that produced no text for the whole session. Once marked dead we
-        //    fall through to the plain-transcription chain below; `beginLiveTranslation`
-        //    keeps translating finals locally if an LLM is configured.
-        // ★ 2026-10-23: the Azure real-time-translation shortcut is only taken when
-        // Azure is also the chosen **live** engine. A user who pinned on-device /
-        // local / remote for captions gets the LLM translation path instead —
-        // otherwise "I picked on-device" silently came back as Azure on screen.
-        //
-        // ★★ 2026-11-04（用户截图：实时引擎=自动 + 当前服务=自定义服务 + 开了中→英
-        //     翻译，左下角却挂着 Azure 徽章）："自动"的含义是**跟随上方的顺序**，
-        //     所以这里判断的必须是"实际会跑的那个引擎"——
-        //     `liveProvider` 为空时它就是 `defaults.primary`，**不是恒真的空串**。
-        //     旧写法 `liveChoice.isEmpty || liveChoice == "azure"` 让"自动 + 主引擎
-        //     是 custom"的组合永远命中这条捷径，用户配的自定义服务在实时里
-        //     一次出场机会都没有（文件转写那侧早就改对了，实时这侧漏了）。
-        //     现在：主引擎是 custom → 走切片引擎 + LLM 翻译（`beginLiveTranslation`）；
-        //     主引擎确实是 azure → 行为与以前完全一致。
         let liveChoice = (config.config.defaults.asr.liveProvider ?? "").lowercased()
         let effectiveLiveEngine = liveChoice.isEmpty
             ? config.config.defaults.asr.primary.lowercased()

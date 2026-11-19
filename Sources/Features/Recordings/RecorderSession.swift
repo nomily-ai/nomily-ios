@@ -569,46 +569,6 @@ final class RecorderSessionModel: ObservableObject {
 
     // MARK: Haptic feedback for start/stop
 
-    /// A single vibration after the user presses start/stop.
-    ///
-    /// ## Why the **phone** vibrates instead of "making the card vibrate"
-    /// User's original words (2026-10-10):
-    /// > When starting and ending recording there should be vibration prompts. The start/stop in the app can record and stop
-    /// > and during recording, but there is no vibration.
-    ///
-    /// This sentence should be answered in two parts, with different conclusions:
-    ///
-    /// ### The single vibration on the card, **App cannot do** (verified, not untried)
-    /// The official App's Chinese documentation makes this clear (`messages_zh_CN.dart`):
-    /// * "Press and hold the power button for 2 seconds, TicNote vibrates once, the display shows recording status, indicating recording has started."
-    /// * "Press and hold the power button for 2 seconds, TicNote vibrates twice, indicating recording has ended."
-    ///
-    /// That means it is a **firmware local behavior bound to the power key**; the path the App takes
-    /// (`0x14` start recording / `0x17` stop recording) is a different branch in the firmware, without vibration.
-    /// Moreover, after translating all **20 command builders** from App→card one by one
-    /// (`protocol-notes.md` §6.1, including `0x28 RECORD_START` / `0x2A PAUSE` /
-    /// `0x2C RESUME` / `0x2E STOP` / `0x3C DELETE_RECORD` full table),
-    /// **none of them is a vibration command**; the 15 handlers from card→App also lack
-    /// (the word "vibration" appears in the entire Dart snapshot only in UI haptic calls and
-    /// the two product copy lines above).
-    ///
-    /// Therefore "make the card vibrate for the App's start/stop" **has no protocol basis** — following this repository's usual rule,
-    /// do not send a guessed frame just to look finished (the cost of a wrong guess is corrupting the card's state,
-    /// and the symptom would masquerade as "card broken").
-    ///
-    /// ### Yet the user can get what they truly want: **"I pressed it, and it worked" confirmation feeling**
-    /// The user presses the **phone**, so placing this single vibration on the phone is an equivalent or even more accurate feedback ——
-    /// A phone vibration can convey "success/failure", while a card vibration can only convey "the motor moved".
-    ///
-    /// ## Why vibrate only for recording cards (`.card`) and not for D·NOTE
-    /// D·NOTE's `startRecording()` is **optimistic**: the command is sent and immediately
-    /// `isRecording = true` (see `start(_:)`), the card may not have acknowledged and **does not** confirm before returning.
-    /// Vibrating there would be lying to the device. TicNote is different ——
-    /// `TicNoteLink.startRecording()` waits until the card pushes `0x14` or a voice frame,
-    /// if not received it throws `.timeout`, so "vibrated" and "card really started" are the same.
-    ///
-    /// ⚠️ When "haptic feedback" is turned off in system settings, `UIFeedbackGenerator` silences itself ——
-    /// We don't need to add a switch, nor should we (the user already has a system‑level toggle).
     private func playStartStopHaptic() {
         // `.medium` strength feels closest to "pressing a physical key"; `.rigid` is more like a "tab",
         // using it for stop will express "end" as a crisp click, contrasting with start as two different operations.

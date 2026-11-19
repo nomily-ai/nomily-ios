@@ -1007,7 +1007,7 @@ private struct LiveContent: View {
     }
 
     private var canMark: Bool {
-        source is DingTalkA1Link || source is SoundcoreLink
+        source is SoundcoreLink
     }
 
     private var markButton: some View {

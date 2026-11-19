@@ -500,11 +500,6 @@ struct RootView: View {
         .onChange(of: bluetooth.adapter) { _ in
             checkPermissionIssues()
         }
-        // ★ 2026-10-26 ("实时字幕按照 Plaud 的那个方式，卡片弹出那种页面"):
-        // the recording stage rises as a card over whatever tab is showing,
-        // raised by `PlaudDirectService.bleRecordStart`. Dismissing it only
-        // hides the UI — the take keeps running, which is exactly what the
-        // official app does.
         .sheet(isPresented: Binding(get: { plaudDirect.showRecordingStage },
                                     set: { plaudDirect.showRecordingStage = $0 })) {
             PlaudRecordingStage()

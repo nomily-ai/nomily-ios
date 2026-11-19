@@ -101,14 +101,6 @@ struct LLMCompletionService {
         var chunkCount: Int
     }
 
-    /// Output cap sent to every provider. `maxOutputTokens(for:)` lowers it for
-    /// local models — see there.
-    ///
-    /// ★ 2026-11-02（用户截图："转写内容怎么这样了都乱的不行"）：4096 → 8192。
-    /// 推理模型（deepseek-reasoner、qwen3 混合思考档）写正文前要先"想"，思考
-    /// 就能吃掉几千 token——4096 的上限经常被思考耗尽，正文一个字都没写。
-    /// 8192 是各家云 API 的公共安全上限（deepseek-chat 恰好 8192，再高会对
-    /// 4k/8k 档的老模型报 400）。
     static let maxOutputTokens = 8192
 
     /// Output cap for local models (Ollama / self-hosted endpoints).

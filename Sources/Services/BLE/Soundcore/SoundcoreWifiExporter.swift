@@ -72,9 +72,6 @@ final class SoundcoreWifiExporter: NSObject {
         /// exportAll 据此**自动重开一次会话**再报错——15:10 日志：加入成功、
         /// 探测失败，其实重发 1A05 就能救，不该甩给用户。
         var isTCPDead: Bool = false
-        /// ★ 2026-10-30（用户截图"无法加入网络 WiFi-…"）：apply 反复成功但
-        /// 始终关联不上——豆的 SoftAP 还没真正广播出来（重开热点比 10 s 慢）。
-        /// 与 isTCPDead 同待遇：上层自动重开会话（换新 SSID），不甩给用户。
         var isJoinDead: Bool = false
         var errorDescription: String? { message }
     }
@@ -509,17 +506,6 @@ final class SoundcoreWifiExporter: NSObject {
                 return
             }
         } else {
-            // ① 先给豆时间把 AP 广播出来（1A05 只是"开始开热点"）。
-            // ★ 2026-10-28（飞书 8.3.6 反编译实锤）：官方 App 在发完 1A05 后默认等
-            // **10 秒**才去连热点（`wifiConnectionDelayMS`，SDKInitConfig 默认
-            // 10000ms，SDKManagerImp r.java:748-750 / D3200Device.Q0）——这就是
-            // "飞书的 WiFi 快传在手机上连得非常慢"的真相：不是连得慢，是故意等豆
-            // 把 SoftAP 完全起好再动手。我们原来只等 3 s，"无法加入网络"的高发
-            // 正是撞在这 3 s 上（AP 还没广播出来，NEHotspotConfiguration 直接拒）。
-            // ★ 2026-10-30：**先把同名残留配置摘掉再等**——上一次 apply 失败留下
-            // 的"半死配置"会让下一次 apply 在豆 AP 还没起来时白白关联、撞出系统
-            // 级"无法加入网络"弹窗（App 拦不掉，只能别去撞）。摘掉后 iOS 不再
-            // 对着一个不存在的 SSID 空转，10 s 后豆 AP 起好了再干净地 apply。
             NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: ssid)
             try? await Task.sleep(nanoseconds: 10_000_000_000)
         }

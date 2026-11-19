@@ -156,11 +156,6 @@ enum SoundcoreTranscoder {
 
     // MARK: - 帧切分 / 探测
 
-    /// ★ 2026-10-28（8.3.6 反编译复核）：**不要 trim 尾部零**。豆的 Opus 是
-    /// CBR 定长 160 B（64 kbps @48 kHz mono），包尾 `0x00` 是合法编码内容，
-    /// 截掉 = 短包 → libopus `INVALID_PACKET` 或只解出部分帧 —— 这正是
-    /// "杂音/解不出来"的直接原因之一。按 160 B 硬切，原样送解码器；
-    /// 不足一帧的尾部是传输残留，直接丢弃（官方 FileWriterHelper 只 append 整帧）。
     private static func splitFrames(_ raw: Data) -> [Data] {
         let bytes = [UInt8](raw)
         var frames: [Data] = []

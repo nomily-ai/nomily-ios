@@ -1072,7 +1072,6 @@
 "ticnote.unbind" = "解绑设备";
 "ticnote.unbind_confirm_title" = "解绑这台设备？";
 "ticnote.unbind_confirm_message" = "卡片会被释放，可以重新配对；本 App 会忘掉它。卡上的录音不会被删除——想保留请先传回手机。";
-"ticnote.unbind_confirm_message_a1" = "这会把该卡片从 Nomily 中移除——包括它的密钥、名称与台账，并断开连接。卡上的录音会保留；钉钉账号内的云绑定需要在官方钉钉 App 里解除。";
 "ticnote.unbind_confirm_action" = "解绑";
 "ticnote.unbinding" = "解绑中…";
 "ticnote.unbind_success" = "已解绑，已从本 App 的列表中移除。";
@@ -1321,63 +1320,8 @@
 "theme.amber.subtitle" = "暖色、低刺眼";
 
 // MARK: - 钉钉 A1 凭据导入（2026-10-18）
-"a1.title" = "钉钉 A1";
-"a1.intro" = "每台钉钉 A1 都有一把独立的设备密钥（deviceSecret）。它是钉钉在你绑定设备时下发的，不能从序列号推导，也从来不走蓝牙链路。所以「第一次」必须从一次已登录的钉钉会话里把它取出来——之后列文件、下载、转录全部离线完成，不再需要钉钉。";
-"a1.step1.title" = "把卡绑到你的钉钉账号";
-"a1.step1.body" = "二手买来的话，先让卖家解绑，然后你在钉钉里扫码绑定。这一步只能你自己做——它决定了这张卡把密钥交给哪个账号。";
-"a1.step2.title" = "在电脑版钉钉打开一次「AI 听记」";
-"a1.step2.body" = "随便点一个模板就行。钉钉会把设备列表（含密钥）写进那台电脑上的日志。";
-"a1.open_import" = "导入这张卡的密钥…";
-"a1.error.no_credential" = "这台手机上还没有这张卡的密钥。打开这张卡的设备信息页 →「卡片密钥」扫码或粘贴导入——只需一次，之后全部离线使用。";
-"a1.error.rejected" = "卡拒绝了已存的凭据（501）。每张卡的 secret 只对它自己有效——请到「设置 → 钉钉 A1」导入这张卡自己的凭据。";
-"a1.error.not_authenticated" = "卡说本次会话未鉴权（405）。请断开重连一次卡片再试。";
-"a1.error.bad_secret" = "已存凭据的 secret 太短，算不出 token。请到「设置 → 钉钉 A1」重新导入。";
-"a1.paste.section" = "粘贴凭据";
-"a1.paste.placeholder" = "把命令复制到的内容粘贴到这里…";
-"a1.paste.from_clipboard" = "粘贴";
-"a1.import" = "导入";
-"a1.paste.footer" = "支持二维码扫描、一行式链接、提取器写出的 JSON，或 key=value 逐行格式。";
-"a1.imported.header" = "已导入";
-"a1.imported.ok" = "就绪——重新连一次卡片即可使用";
-"a1.card.name" = "卡片";
-"a1.card.sn" = "序列号";
-"a1.recordmode.title" = "录音模式";
-"a1.recordmode.picker_title" = "录音模式";
-"a1.recordmode.footer" = "卡片已连接时，选完会立即写入卡片；离线时只保存在 App 内。";
-"a1.recordmode.saved_offline" = "已保存在 App 内——连接卡片后再写入。";
-"a1.recordmode.applying" = "正在写入卡片…";
-"a1.recordmode.applied" = "已生效：卡片确认了新值。";
-"a1.recordmode.apply_failed" = "卡片没有确认修改，仅保存在 App 内。";
-"a1.recordmode.general.name" = "通用模式";
-"a1.recordmode.general.badge" = "通话录音 / 人声增强";
-"a1.recordmode.general.subtitle" = "标准高清拾音，AI智能降噪";
-"a1.recordmode.meeting.name" = "会议模式";
-"a1.recordmode.meeting.badge" = "8米拾音";
-"a1.recordmode.meeting.subtitle" = "会议室专用，中远距离拾音";
-"a1.recordmode.facetoface.name" = "面对面沟通";
-"a1.recordmode.facetoface.badge" = "侧面消音";
-"a1.recordmode.facetoface.subtitle" = "设备正对用户放置拾音，屏蔽其他方位声音";
-"a1.recordmode.visual.name" = "AI可视听记";
-"a1.recordmode.visual.badge" = "beta · 显示方位";
-"a1.recordmode.visual.subtitle" = "让声音能够被看见，识别方位";
-"a1.recordmode.lossless.name" = "无损原声";
-"a1.recordmode.lossless.badge" = "不降噪 · 48K保真";
-"a1.recordmode.lossless.subtitle" = "高保真，48kHz录制所有声音";
-"a1.card.secret" = "密钥";
-"a1.cards.header" = "这台手机上已有";
-"a1.cards.footer" = "密钥只存在 iOS 钥匙串里：不写进设置文件，也不上传到任何地方。左滑可移除，卡片本身不受影响。";
-"a1.delete.title" = "移除这张卡的凭据？";
-"a1.delete.message" = "移除后 Nomily 就读不了这张卡了。卡里的录音不受影响。";
-"a1.import_failed" = "导入失败";
 
 /* ---- 钉钉 A1：二维码 / 深链导入 ---- */
-"a1.scan.action" = "扫描二维码";
-"a1.scan.hint" = "把镜头对准电脑上那条命令打出的二维码。";
-"a1.scan.denied" = "Nomily 没有相机权限。到「设置 → Nomily AI → 相机」打开，或者改用粘贴。";
-"a1.scan.no_camera" = "这里没有可用的相机。";
-"a1.scan.failed" = "这个二维码不是钉钉 A1 的凭据。请扫电脑上提取脚本打出的那一个。";
-"a1.link.imported" = "凭据已导入";
-"a1.link.imported_body" = "%@ 已就绪。回到设备页点「再试一次」即可。";
 
 /* ---- 要点（录音时在卡上打点） ---- */
 "clip_detail.remarks" = "要点";
@@ -1386,15 +1330,6 @@
 "clip_detail.remarks_footer" = "录音过程中在卡上按一下录音键，会在那一刻打一个点。点一下就能跳到那个位置。";
 
 /* ---- A1：每张卡自己的密钥（设备信息页） ---- */
-"a1.section.title" = "卡片密钥";
-"a1.section.footer" = "这把密钥只属于这张卡，不是 App 级设置；换一张 A1 要各自导入。它存在 iOS 钥匙串里，不会离开这台手机。";
-"a1.missing.title" = "这台手机上还没有这张卡的密钥——导入之前读不了它。";
-"a1.replace" = "更换密钥";
-"a1.remove" = "删除密钥";
-"a1.paste.manually" = "改为粘贴";
-"a1.how_to" = "怎么拿到密钥？";
-"a1.scoped_to" = "只针对 %@";
-"a1.mismatch" = "已保存，但它的序列号结尾是 %@，而这张卡是 %@。如果你要的是这张卡，请导入它自己的那一个。";
 
 "summarize.chip_recommended" = "推荐";
 "summarize.chip_custom" = "自定义";
@@ -1565,7 +1500,6 @@
 "scanner.pick_hint" = "选择设备类型，再进行扫描";
 "scanner.category_vobot" = "V05E";
 "scanner.category_ticnote" = "TicNote";
-"scanner.category_a1" = "钉钉 A1";
 "scanner.category_plaud" = "PLAUD";
 "scanner.category_watch" = "Apple Watch";
 "scanner.category_soundcore" = "soundcore Work · 飞书录音豆";

@@ -6,7 +6,6 @@ final class TicNoteWifiSession {
     // MARK: Configuration
 
     struct Config: Equatable {
-        /// The token returned to the card in the handshake. In the official App it is a constant `"1234567890000000"` passed in from the Dart side.
         var token: String = "1234567890000000"
 
         /// ⚠️ Semantics unconfirmed (see the file header). Default is 0, but **explicitly requires the caller to know what it is passing**.
@@ -21,13 +20,6 @@ final class TicNoteWifiSession {
         /// same as above. The real semantics of `single` are still unsolved, so here we only guarantee byte-for-byte parity with the official one.
         var listSingle: Int64 = TicNoteWifiListRequest.officialSingle
 
-        /// Use V2 (cmder 20 / 19) or V1 (11 / 12).
-        ///
-        /// ★★★ Default is **V1**, the conclusion after two corrections on 2026-10-12:
-        ///   · The official App **only uses V1** (both Dart entry points call `getFileList` / `downFileList`,
-        ///     while `getFileListV2` / `downFileListV2` never appear even once in the Dart snapshot);
-        ///   · On the real device the card replies to cmder 20 directly with `{"cmd":20,"code":3}`, then ignores us for 30 s.
-        /// Full evidence is in the passage at the top of `TicNoteWifiCmder`.
         var useV2: Bool = false
 
         /// Whether to automatically ask for the file list once after the handshake.
@@ -342,12 +334,6 @@ final class TicNoteWifiSession {
                 return []
 
             case TicNoteWifiCmder.universalError:
-                // ★ The official `WifiPlugin.java` dispatch has **no case for cmder=0**:
-                //   it falls straight to `default: return` -- the official App **does nothing** on receiving this frame,
-                //   and keeps waiting for the list. We previously treated it as a fatal error, and the real-device symptom was
-                //   "wifi listing failed: device reported a universal error".
-                //   Now aligned with the official side: only record, don't fail. A genuine error goes through the timeout,
-                //   and the timeout error carries this original text (see the timeout path of `TicNoteWifiLink.drive`).
                 recordUniversalError(frame)
                 // ★★ 2026-10-12 adds a fast-fail layer for "named rejection".
                 //

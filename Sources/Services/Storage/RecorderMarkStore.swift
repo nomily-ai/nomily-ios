@@ -1,16 +1,14 @@
 import Foundation
 import os.log
 
-private let log = Logger(subsystem: "com.nomily.app.ios", category: "a1.marks")
+private let log = Logger(subsystem: "com.nomily.app.ios", category: "recorder.marks")
 
-// MARK: - "Remark" marks made on the DingTalk A1 while recording
+// MARK: - Recording markers
 //
 // ## What this is
 //
-// Mid-recording, the card's button produces `AUDIO_CONTROL_REMARK_BUTTON_CLICK`
-// (`0x0B000001`) — the gesture that makes DingTalk drop a marker into the recording ("mark").
-// The card stamps the event with its **own** clock, so the offset from `AUDIO_RECORD_START`
-// is exact even when the report is delivered in a batch seconds later.
+// A recorder can add a timestamped marker during a recording. The marker offset is stored
+// alongside the clip so that the detail view can link back to the original moment.
 //
 // ## Two storage shapes, on purpose
 //
@@ -23,21 +21,21 @@ private let log = Logger(subsystem: "com.nomily.app.ios", category: "a1.marks")
 // "record → mark → download in the same session"), and deleting the clip deletes its marks
 // with it — the sidecar is a clip artefact, not a hidden global database.
 
-struct A1Mark: Codable, Equatable {
+struct RecorderMark: Codable, Equatable {
     /// Seconds from the start of that recording.
     let offset: TimeInterval
     /// When the press happened, in the phone's clock — only used for display/sorting.
     let at: Date
 }
 
-enum A1MarkStore {
+enum RecorderMarkStore {
 
     /// `{ "1792306652": [ {"offset": 12.4, "at": "…"}, … ] }`
     ///
     /// Lives next to the download manifest rather than in the container root: it is bookkeeping about
     /// device files (keyed by the card's `fid`), not a clip artefact.
     private static var indexURL: URL {
-        StorageLocations.audioDir.appendingPathComponent(".a1-marks.json")
+        StorageLocations.audioDir.appendingPathComponent(".recorder-marks.json")
     }
 
     /// Where the clip sidecar goes — **the same directory as the clips themselves**.
@@ -51,7 +49,7 @@ enum A1MarkStore {
 
     // MARK: Capture (before download)
 
-    static func add(_ mark: A1Mark, toFile fid: UInt32) {
+    static func add(_ mark: RecorderMark, toFile fid: UInt32) {
         var all = loadIndex()
         let key = String(fid)
         var list = all[key] ?? []
@@ -65,7 +63,7 @@ enum A1MarkStore {
         log.info("mark \(mark.offset, format: .fixed(precision: 1))s on fid \(fid, privacy: .public) — \(list.count) total")
     }
 
-    static func marks(forFile fid: UInt32) -> [A1Mark] {
+    static func marks(forFile fid: UInt32) -> [RecorderMark] {
         loadIndex()[String(fid)] ?? []
     }
 
@@ -95,9 +93,9 @@ enum A1MarkStore {
     }
 
     /// What the detail page reads. Missing/failed → empty, never a placeholder.
-    static func sidecar(forClipBase base: String) -> [A1Mark] {
+    static func sidecar(forClipBase base: String) -> [RecorderMark] {
         guard let data = try? Data(contentsOf: sidecarURL(forClipBase: base)),
-              let marks = try? JSONDecoder().decode([A1Mark].self, from: data)
+              let marks = try? JSONDecoder().decode([RecorderMark].self, from: data)
         else { return [] }
         return marks.sorted { $0.offset < $1.offset }
     }
@@ -114,14 +112,14 @@ enum A1MarkStore {
 
     // MARK: Index plumbing
 
-    private static func loadIndex() -> [String: [A1Mark]] {
+    private static func loadIndex() -> [String: [RecorderMark]] {
         guard let data = try? Data(contentsOf: indexURL),
-              let dict = try? JSONDecoder().decode([String: [A1Mark]].self, from: data)
+              let dict = try? JSONDecoder().decode([String: [RecorderMark]].self, from: data)
         else { return [:] }
         return dict
     }
 
-    private static func saveIndex(_ dict: [String: [A1Mark]]) {
+    private static func saveIndex(_ dict: [String: [RecorderMark]]) {
         guard let data = try? JSONEncoder().encode(dict) else { return }
         try? data.write(to: indexURL, options: .atomic)
     }

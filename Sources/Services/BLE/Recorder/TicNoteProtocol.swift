@@ -6,34 +6,6 @@ import Foundation
 
 // MARK: - GATT constants
 
-/// TicNote recording card (internal code `ClipDevice` / `juzhicard`) BLE channel constants.
-///
-/// ⚠️ **Important correction**: early versions of this file treated `e49a25f8 / e49a25e0 / e49a28e1`
-/// as this card's FIFO service — **that was wrong**. Those three UUIDs belong to
-/// `com.actions.ibluz` (Juzhi Actions iBluz), the official App only uses them for
-/// `watch_plugin.actota.ActsOtaUtil` OTA channel, unrelated to recording data.
-///
-/// Evidence chain for this card's write channel (each hop traceable):
-/// ```
-/// Dart watch_audio_service._sendCommand()
-///   → method channel "sendDataToClipDevice"
-///   → WatchPlugin.handleSendDataToClipDevice()
-///   → UTEBleEngine.sendDataToClipDevice()
-///   → RecordingDeviceManager.sendDataToClipDevice()          // log tag "APK--->BLE CLIP"
-///   → UteBleConnection.sendDataToClipDevice()                // interface
-///   → utejxdo.utejxfor.sendDataToClipDevice()                // implementation
-///   → utejxfor.utejxtry.utejxdo().utejxdo(bArr)
-///   → utejxdo.utejxif.utejxint().utejxnew(bArr)              // ← the actual read/write method
-///   → gatt.getService(00001910…).getCharacteristic(00002bb1…)
-/// ```
-/// Source: `utejxdo/utejxif.java` lines 515–531 — before writing, first
-/// `setValue(bArr)` + `writeCharacteristic()`, on failure `sleep(20ms)` and retry.
-///
-/// Notification channel evidence: `utejxdo/utejxif.java` lines 843–852 notify registration dispatch
-/// (log string `notifySet7 = `) uses **the same** Service `00001910` with `00002bb0` to enable notifications;
-/// and the write callback in `utejxdo/utejxtry.java` lines 285–288 dispatches via `00002bb1`
-/// `UteListenerManager.onClipDeviceWrite(...)`. The two are mirror images, 2bb0/2bb1 are paired
-/// notify/write characteristics.
 enum TicNoteGATT {
     /// Service — UTE SDK constant `utejxif.utejxreturn`
     static let clipService = CBUUID(string: "00001910-0000-1000-8000-00805f9b34fb")
@@ -45,12 +17,6 @@ enum TicNoteGATT {
     /// Enabling notifications requires writing the CCCD (standard value) — UTE SDK constant `utejxif.utejxsuper`
     static let clientCharacteristicConfiguration = CBUUID(string: "00002902-0000-1000-8000-00805f9b34fb")
 
-    /// **Application-layer command write type: without response (`.withoutResponse`)** — real-device capture proof.
-    ///
-    /// The characteristic itself declares both `WRITE` and `WRITE NO RESPONSE`, but the official App's
-    /// 14 application-layer commands all use `0x52 Write Command` (without response), only
-    /// `01 1D 00` (getSessionState) and CCCD use `0x12 Write Request`.
-    /// Source: `ticnote-re/captures/btsnoop_20261008.cfa`.
     static let usesWriteWithoutResponse = true
 
     /// The card itself initiates MTU exchange (real-device test requests **93**), a rare behavior:
@@ -553,8 +519,6 @@ enum TicNoteOpusStream {
 
 /// Identity information extracted from the card's broadcast.
 struct TicNoteAdvertisement {
-    /// Card serial number (ASCII). This is the primary key the official App uses to identify the card
-    /// (`[CardOta] device distinguishes sn=`, during binding `checkDeviceBind: `, cloud `deviceInfo.sn`).
     let sn: String
     /// Bytes skipped before the SN in the manufacturer data. Kept only for matching real‑device broadcasts,
     /// the official code does not read it (presumably model / hardware version, etc.).
@@ -590,8 +554,6 @@ struct TicNoteAdvertisement {
 /// Method to verify on a real device is in `CAPTURE-MANUAL.md` (just capture a detailed screenshot with nRF Connect).
 enum TicNoteAdvertisementParser {
 
-    /// Bluetooth SIG company identifier. `0x0259 = 601`, little‑endian on the wire is `59 02`.
-    /// This is **the first and only gate for identifying the card** (more reliable than device name: the official App allows renaming).
     static let companyID: UInt16 = 601
 
     /// AD type of manufacturer custom data in the scanned AD structure.
@@ -977,69 +939,6 @@ enum TicNoteObservedCommand: UInt16 {
     /// Using it as "recorded duration" will freeze the timer at 0:00 (reported by users).
     /// Therefore only values **greater than 0** are trusted.
     case notifyRecordingState   = 0x17
-    /// ★★★ **Card→App: recording status report** (`0x18`) — **19th round real-device new finding**
-    ///
-    /// This command code **is not in any static reverse‑engineering table**, discovered on 2026-10-10 with `tools/bleprobe rec`
-    /// It is returned by the card after sending `0x14` on a real device. It is **currently the only way to read the "recorded byte count" in real time**.
-    ///
-    /// ## Candidate layout (all four real‑device samples are self‑consistent)
-    /// ```
-    /// <u8 len=0x0a> <u32 sessionId> <u32 recordedBytes> <u8 status>
-    /// ```
-    ///
-    /// Four samples (`tools/bleprobe` 19th round log, byte‑by‑byte extraction):
-    ///
-    /// | Timing | payload | sessionId | recordedBytes | status |
-    /// |---|---|---|---|---|
-    /// | After start 1.6 s | `0a 7b db c9 02 00 00 00 00 00` | `0x02C9DB7B` | **0** | 00 |
-    /// | After start 4.3 s | `0a 7b db c9 02 c0 4e 00 00 00` | `0x02C9DB7B` | **20,160** | 00 |
-    /// | After A segment frame of A/B 1.6 s | `0a cc da c9 02 00 00 00 00 00` | `0x02C9DACC` | **0** | 00 |
-    /// | After B segment frame of A/B 0.06 s | `0a cc da c9 02 00 f0 00 00 04` | `0x02C9DACC` | **61,440** | 04 |
-    ///
-    /// ## Why we can claim `recordedBytes` is the byte count (triple independent verification)
-    /// 1. **Both values are multiples of 80** — and a `0x02` voice frame is exactly 80 bytes of plaintext
-    ///    （`20,160 = 252 × 80`、`61,440 = 768 × 80`）。
-    /// 2. **The rate matches**: `(20,160 − 0) B ÷ 2.670 s = 7,551 B/s ≈ 94 frames/s`,
-    ///    which is on the same order as the measured ~100 frames/s of the `0x02` voice stream.
-    /// 3. **The byte count of the stop‑record frame matches the wall clock**: the same round's `0x17` reports `0x0000C4E0 = 50,400`,
-    ///    and `50,400 ÷ 8,000 B/s = 6.3 s`, which is exactly the interval from "card starts recording (1.6 s after start frame) → stop‑record frame".
-    ///    **Not an estimate, but a calculation**.
-    ///
-    /// ## Also verified the `sessionId` entry
-    /// `0x02C9DB7B` differs from the other round's `0x02C9DACC` by **0xAF = 175 seconds**, and the wall‑clock interval between the two experiments
-    /// is exactly 14:30:19 − 14:27:24 = **175 seconds**. The two are synchronized to the second — indicating that this field
-    /// is the card's **post‑sync timestamp**.
-    /// ⚠️ However it lacks the high 6 bits of a true Unix second (`0x6AC9DB7B & 0x03FFFFFF = 0x02C9DB7B`),
-    /// i.e., **truncated to 26 bits**. Therefore it **cannot** be used for date display (`startedAt` will reject it).
-    ///
-    /// ## Why this command is critical
-    /// The card **does not spontaneously push `0x02` voice frames** — the 563,520 B voice stream at 73 s was generated by the official App
-    /// by issuing 351 `0x1C` requests to pull it piece by piece (§20.7). Therefore:
-    /// * "Is recording?" **cannot** be determined solely by voice frames (they will never appear);
-    /// * `0x18` is the **card‑initiated signal that reflects recording progress in real time**.
-    /// Empirically, the trigger condition: after sending `0x14` (start) or `0x1A` (list files), the card always returns a message.
-    ///
-    /// ## ★ 2026-10-12 Addendum: it is actually a **start‑recording acknowledgment**, and it is high‑frequency (see §31.3①)
-    /// `captures/app-diag-2026-10-10-1541.log` contains over 200 `0x18` entries covering the entire recording process,
-    /// spanning 8 sessions. **The App starts recording 8 times, and each time the card returns this** (not `0x14`) —
-    /// so the criterion for "start successful" should be "receiving `0x18`".
-    ///
-    /// ✅ **2026-10-12 decision (§32.1): two frame formats, differing by a 1‑byte optional length prefix.**
-    /// Both records **are 13 B ATT / 10 B payload**, the only difference is the nature of the first byte:
-    /// ```
-    /// Format A — official App (`app-diag-2026-10-10-1541.log` 200+ entries)
-    ///   01 18 00 | B5 B2 CC 6A 02 00 00 00 00 00
-    ///              └─ sid(4) ─┘ 02 bytes(4) st   → sid offset 0 = 0x6ACCB2B5 (timestamp)
-    /// Format B — probe (`bleprobe-rec-2026-10-10.log:53`, log marks it as "guess")
-    ///   01 18 00 | 0a 7b db c9 02 00 00 00 00 00
-    ///              ↑length  └─ sid(4) ─┘ bytes(4) st → sid offset 1 = 0x02C9DB7B
-    /// ```
-    /// Criterion: `payload.count <= 255 && Int(b[0]) == payload.count` ⇒ includes length prefix.
-    /// **The only invariant is that `bytes` always reside in `b[5..8]` and `status` always in `b[9]`** — only the start of sid changes.
-    ///
-    /// ⛔ Previously inferred from Format B that "sid was truncated to 26 bits", **that conclusion has been retracted**: `0x02C9DB7B`
-    /// is the result of a "right shift by one byte", not a genuine 26‑bit timestamp reported by the card. The full specimen is shown in
-    /// `TicNoteRecordingState.parse()` documentation.
     case notifyRecordState      = 0x18
     /// ★ **Get file list** — request/response structure see `TicNoteFileList`.
     ///
@@ -1101,33 +1000,6 @@ enum TicNoteObservedCommand: UInt16 {
 
 // MARK: - Device information query (cmd 0x01 / 0x03 / 0x08 / 0x09)
 
-/// The commands to send for a single "read device info" request, and the **expected response command code** for each.
-///
-/// All bytes taken from real‑device capture `captures/att-decoded.txt` (official App session,
-/// ATT numbers #29960–#29998). Left side is the full frame we sent, right side is the full frame returned by the card:
-///
-/// ```
-/// APP->CARD  01 01 00 | 02 01 00                        identity **query**
-/// CARD->APP  01 02 00 | 00×56 56 07 00 00 01            61 B identity response
-/// APP->CARD  01 03 00                                   read status
-/// CARD->APP  01 03 00 | 01 00 00 00 00 00 00 01 00      9 B
-/// APP->CARD  01 08 00 | 01                              read configuration
-/// CARD->APP  01 08 00 | 00 02 00 01 7F 00 00            7 B
-/// APP->CARD  01 09 00                                   battery
-/// CARD->APP  01 09 00 | 00 64                           2 B  ← 0x64 = 100%
-/// ```
-///
-/// ★ **`0x01` is the only "request code ≠ response code"** (request `0x01`, response `0x02`).
-/// The other three use the same code for request and response.
-///
-/// ⛔ **The previous version said "the symptom of this mistake is easy to recognize: identity never reads, battery reads" —— that statement is wrong; on a real device it is the opposite**:
-/// Putting `0x01` and the read commands into the same burst,
-/// identity **is readable** (card returns `0x02`), while the subsequent three read commands **receive no responses**.
-/// Full evidence and batching rules are described in the comments of `greetingSteps` / `readSteps` below.
-///
-/// ⚠️ Relation to §17.1: the official 45‑byte binding frame (`02 01 01 <16B token> <len> <name>`)
-/// differs from the **identity query** here by only the third byte (`0x00` = read‑only, `0x01` = write).
-/// **Do not** send `TicNoteWifiProvisioning.sendTokenFrame` as a query — it would change the card's hotspot name.
 enum TicNoteDeviceInfoQuery {
 
     /// A single read command.
@@ -1210,55 +1082,6 @@ enum TicNoteDeviceInfoQuery {
     /// Payload for identity **query**: real device `02 01 00`.
     static let identityQueryPayload = Data([0x02, 0x01, 0x00])
 
-    /// A `0x09` response packet yields **two** fields: battery level + charging flag.
-    ///
-    /// The struct is defined at the **top level of the file** (see `TicNoteBatteryReading` below),
-    /// at the same level as `TicNoteStorageInfo` / `TicNoteGeneralSetting` —
-    /// it is data, not a command, and both the link layer and UI layer use it.
-    ///
-    /// ## Byte
-    /// ```
-    /// 01 09 00 | 00 64      Not charging, battery 100%
-    /// 01 09 00 | 01 64      Charging, battery 100%
-    /// ```
-    /// In real device samples, the first byte only takes two values: `00` (majority) and `01` (minority); the last byte is **always `0x64` = 100** (consistent with the 100% reported by the standard Battery Service on the card).
-    /// 
-    ///
-    /// ## ★ Evidence chain for the first byte being "charging" (**not** derived from this single byte alone)
-    /// The criterion is that **two mutually independent fields flip simultaneously** within the same session:
-    ///
-    /// ```
-    /// 10 captured `0x03` (device status) payloads have only two variants:
-    ///   01 03 00 | 01 00 00 00 00 00 00 01 00   × 9   state = 0x00000001
-    ///   01 03 00 | 01 20 00 00 00 00 00 01 00   × 1   state = 0x00002001
-    ///
-    /// And for the **only** sample with 0x2000 set, the 0x09 in the same batch of responses is `01 64`
-    /// (the other 9 batches are all `00 64`).
-    /// ```
-    /// When two unrelated fields flip simultaneously in the **same** session, the simplest explanation is "external power supply".
-    ///
-    /// The same thing can be read directly in the official App: its device status decoding table hardcodes
-    /// `state == 0x4002` to the string "USB Connected (Charging)"
-    /// （`blutter_out/asm/ticnote/util/tools/watchBle/audio_services/watch_audio_service.dart`
-    /// the `_handleDeviceStatusResponse` in `blutter_out/asm/ticnote/util/tools/watchBle/audio_services/watch_audio_service.dart`) — the manufacturer itself treats "USB connected == charging".
-    ///
-    /// ⚠️ **The official charging values are `0=Not Charging, 1=Charging, 2=Fully Charged` (three states)**
-    /// (see the comment after `Battery Status Update: Battery Level=… %, Charging Status=…` in the same official package).
-    /// Only `0` and `1` appeared in the 10 local captures, **with no sample for `2`**,
-    /// so this bit currently only serves as "is charging": `2` falls back to `nil` (unknown),
-    /// the UI displays `—` instead of guessing "Charging" or "Fully Charged" for the user.
-    /// To support the "Fully Charged" state, a real device sample with `0x09` header byte `0x02` is needed ——
-    /// once obtained, it can be added according to the official table.
-    ///
-    /// ## ⚠️ Confidence: Correlation from 10 samples, **not** from vendor documentation
-    /// So `isCharging` is **ternary**: unrecognized flags are always `nil` ("unknown"),
-    /// **never** guessing `false` for the user — that would misinterpret "not read" as "not charging".
-    /// The raw flag byte remains in `flag`, so the UI/logs can print it for reconciliation.
-    ///
-    /// ⚠️ Prefer returning `nil` over a guessed value: battery `> 100` is always treated as "not battery data"
-    /// (If this actually occurs, it indicates the peer has changed the message format; reporting "unreadable" is far better than reporting "255% battery").
-    /// Single-byte replies have no flag bits to read, so they are also treated as "unreadable" — the old function `batteryPercent`
-    /// only takes the last byte and will **still return it** for single-byte replies; this lenient approach is reserved only for the old function.
     static func batteryReading(fromReplyPayload payload: Data) -> TicNoteBatteryReading? {
         guard payload.count >= 2, let flag = payload.first, let raw = payload.last else {
             return nil
@@ -1521,41 +1344,6 @@ enum TicNoteRecordingState {
         }
     }
 
-    /// Parse the payload of `0x14` / `0x17` / `0x18`. **All are fixed-length 10 bytes**; if shorter, return nil immediately,
-    /// Commands other than these also return nil (no "best-effort" truncated parsing: if the frame length is wrong, it means the peer has changed its format,
-    /// at which point the guessed sessionId would be a plausible-looking wrong value, which is harder to debug than not getting one at all).
-    ///
-    /// ## ★★★ 2026-10-12: `0x18` has **two frame formats**, both must be recognized
-    ///
-    /// Two real-device raw records (both **13-byte ATT**, **10-byte payload**, differing only in the nature of the first byte):
-    ///
-    /// ```
-    /// Form A — Official App (`captures/app-diag-2026-10-10-1541.log` 200+ entries;
-    ///           `Documents/ticnote-ble.log` 2026-10-12 real-time transcription start receipt)
-    ///   01 18 00 | B5 B2 CC 6A 02 00 00 00 00 00
-    ///              └─ sid(4) ─┘ 02 bytes(4)  st     → sid at offset 0 = 0x6ACCB2B5 ✓ timestamp
-    ///
-    /// Form B —— Probe (`captures/bleprobe-rec-2026-10-10.log`)
-    ///   01 18 00 | 0a 7b db c9 02 00 00 00 00 00
-    ///              ↑ Length └─ sid(4) ─┘ bytes(4) st → sid at offset 1 = 0x02C9DB7B
-    /// ```
-    ///
-    /// Criterion: **the first byte equals the payload length** (`b[0] == payload.count`) ⇒ it is a length prefix ⇒ Form B.
-    /// Form B's `0x0a` is exactly 10; Form A's `B5` is the highest byte of the sid and is unrelated to this frame's length.
-    ///
-    /// ⚠️ The only risk of this criterion: the highest byte of the sid in Form A happens to equal 10
-    ///    (i.e., sid ∈ `0x0A000000…`, around 2022-05). The sid is a Unix timestamp, and the current time is
-    ///    2026-10 (`0x6A…`), so a collision is unlikely unless the RTC is severely off.
-    ///
-    /// /// ## This history is worth keeping (it's a complete specimen of "how wrong values masquerade as conclusions")
-    /// /// Initially, only Form B was seen, so it was written as "sid at offset 1", and based on this it was deduced that
-    /// /// **"The sid in `0x18` is a timestamp truncated to 26 bits (`0x6AC9DB7B → 0x02C9DB7B`)"**.
-    /// /// Later, only Form A was seen, so it was written as "sid at offset 0". **Since each side had only seen half, both were treated as the whole.**
-    ///
-    /// Cost: During the 2026-10-12 real-time transcription, form A was read at offset 1, and sid was parsed as `0x026ACCB2`,
-    /// sending `0x1C` with it got stuck at `02` (rejected), and all 4 candidates failed within 0.13 s —
-    /// the user saw "tap to record, the red light flashes once and goes out", **and no error message could point back to this**.
-    /// So now both forms are pinned in the code and in self-checks respectively.
     static func parse(cmd: UInt16, payload: Data) -> SessionNotice? {
         guard payload.count >= 10 else { return nil }
         let b = [UInt8](payload)
@@ -1613,27 +1401,6 @@ enum TicNoteRecordingState {
 
 // MARK: - Recording Scene (rec_scene)
 
-/// The **recording scene** (rec_scene) —— the "non-constant" byte in the start-record frame.
-///
-/// ## Where it comes from (★ This overturns a previous assumption)
-/// The 5th byte of the start-recording frame `01 14 00 | 01 <scene> 00 00 00 00` was once treated as a fixed `0x02`
-/// and written into `fixedPayload`. After disassembling `WriteCmd::recordStart`, we found it **is a parameter**:
-///
-/// ```
-/// [asm fact] blutter_out/asm/…/writeBle.dart  WriteCmd::recordStart(dynamic _)
-///   After taking the lower 8 bits of the argument, it is written to the 5th byte of the payload (the remaining 4 bytes are always 0)
-/// [Caller]  ble.dart  BluetoothManager::beginRec:
-///               1. stopBleSync()        ← ★ First, close the sync session (see TicNoteLink.startRecording)
-///               2. generalSetting()     ← Read general settings, extract rec_scene
-///               3. WriteCmd::recordStart(<rec_scene>)
-/// [Real device log] captures/bug/bugreport-…txt
-///               "General settings received {rec_led_status: 0, rec_scene: 2, rec_mode: 0,
-///                                 row_data: 1, dmic_mode: 127}"
-/// ```
-///
-/// That is: the official App **reads the card's scene settings first, then uses this value to start recording**.
-/// This enum provides fallback values; actual values should prefer `TicNoteGeneralSetting.recScene`
-/// (see `TicNoteLink.startRecording`).
 enum TicNoteRecordingScene {
 
     /// /// Default scene.
@@ -1697,10 +1464,6 @@ struct TicNoteStorageInfo: Equatable {
         )
     }
 
-    /// "117 MB" / "58.2 GB" —— **Matches the official App**:
-    /// The official app shows "117 MB / 58.2 GB" for the same card at the same time, so MB has no decimal, GB has one digit.
-    /// Implementation resides in `RecorderStorageInfo.formatBytes` (the cross‑protocol layer); this type only forwards it
-    /// — to avoid a second formatting rule if D·NOTE later needs to display capacity.
     static func formatBytes(_ bytes: Int64) -> String {
         RecorderStorageInfo.formatBytes(bytes)
     }
@@ -1718,52 +1481,6 @@ struct TicNoteStorageInfo: Equatable {
 
 // MARK: - Microphone gain (official "Microphone Gain" selector)
 
-/// All possible values for the "Microphone Gain" item on the official card device page — only two levels.
-///
-/// ## Evidence chain (assembled from two files in `blutter_out/asm/ticnote/modules/my_device/`)
-///
-/// **① UI side** (`my_device_page.dart::_renderDbPop`, `:4212`):
-/// ```
-/// AllocateArray(2) → [48, 72]  → remove Smi tag → List<int> [24, 36]
-/// Text(S.of().myNewDevice_Mic)              ← the title is "Microphone Gain"
-/// thatList.asMap().entries.map((entry) { … "$entry.value db" … })
-/// ```
-/// `[24, 36].asMap()` = `{0: 24, 1: 36}` —— this is exactly the source of a `<int,int>` Map,
-/// It also explains why each entry displays **`"24 db"` / `"36 db"`** (using `entry.value`).
-///
-/// **② Selected state**: the closure compares `entry.key == logic.field_8f.value`
-/// → **`field_8f` stores an "index", not a dB value**.
-///
-/// **③ Logic side** (`my_device_logic.dart`):
-/// ```dart
-/// // When constructing: field_97 = List<int>[214, 254]        ← 0xD6 / 0xFE
-/// //         field_8f.value = field_97.indexWhere((e) => e == reported dmic_mode)
-/// //         (if not found, defaults to 0)
-/// changeVolume(dB, index) {
-///   field_8f.value = index                  ← selected state
-///   field_93.value = dB                     ← display state
-///   send([1, 8, 0] + [2, led, scene, mode, row_data, field_97[index]])
-/// }
-/// ```
-/// `field_97` is assigned `[214, 254]` at `:8486` (**the only assignment point**),
-/// and the 6th byte sent is `field_97[index]`.
-///
-/// **④ The two levels derived from this, and their respective on‑device bytes**:
-///
-/// | Index | Official UI | Sent byte |
-/// |---|---|---|
-/// | 0 | `24 db` | **`0xD6` = 214** |
-/// | 1 | `36 db` | **`0xFE` = 254** |
-///
-/// ## ⚠️ Why there are "two levels" instead of a slider
-/// The official side only provides these two values (`field_97` is **constant**, two elements).
-/// Turning the UI into a slider would conjure up 20 values that the official firmware has never validated — that's not "more functionality", it's "more likely to brick the card".
-///
-/// ## ⚠️ The `dmic_mode` reported by the card is not the same field
-/// On the real device, the 5th byte of the `0x08` response is `0x7F` (=127), **not in** `[0xD6, 0xFE]` —
-/// Therefore the official App will also map to index 0 on this card ("24 db").
-/// Direct consequence: **After changing the gain, reading `0x08` cannot verify it** (that byte remains unchanged).
-/// Thus the UI does not promise a "read‑back confirmation", only says "sent".
 enum TicNoteMicrophoneGain: Int, CaseIterable, Identifiable {
 
     /// Official index 0 — UI shows `24 db`, on‑device byte `0xD6`.
@@ -2397,19 +2114,6 @@ enum TicNoteRecorderSpec: RecorderProtocolSpec {
 
     // MARK: Broadcast identification (confirmed algorithm)
 
-    /// TicNote card identity is based on **ASCII SN in manufacturer data**, not the device name.
-    ///
-    /// Basis: native `WatchPlugin.parseScanRecordForSN()` only recognizes AD type `0xFF` and
-    /// company identifier = `0x0259` (601) broadcasts, and extracts the length‑prefixed ASCII string at a fixed offset
-    /// as `sn`; `createScanDeviceMap()` sends it as the `sn` field to Dart.
-    /// The official App allows users to change the device name, so **never** fall back to the name — return nil if there is no manufacturer data.
-    ///
-    /// Note: only `manufacturerData` is needed here. `localName` / `serviceUUIDs` are abstract‑layer
-    /// additional clues; this card does not use them (the card will not put private service UUIDs into advertisements).
-    ///
-    /// ⚠️ This function and `TicNoteAdvertisementParser` are both **directly copied from official byte offsets**,
-    /// not yet verified against real device advertisements. Before releasing (`isVerified = true`), please first follow
-    /// `CAPTURE-MANUAL.md` to verify with nRF Connect that the SN can be extracted and matches the SN on the card/App.
     static func parseAdvertisement(
         manufacturerData: Data?,
         localName: String?,
@@ -2525,13 +2229,6 @@ enum TicNoteRecorderSpec: RecorderProtocolSpec {
 
     // MARK: Binding and encryption (partially confirmed)
 
-    /// No process found on the App side that writes a binding identifier to the card (D·NOTE’s 16‑byte bondID in
-    /// TicNote’s command table **has no corresponding command**), so fill nil.
-    /// The card’s “binding” semantics appear in the official App’s `juzhicard` + SN records, belonging to the App‑side account state.
-    ///
-    /// Real‑device evidence: `0x01 setDeviceIdentity` indeed includes a 16‑byte identifier in those 45 bytes
-    /// (real device value `"1234567890000000"`), but it is confirmed by the **card** via a `0x02` response,
-    /// and the entire download/time‑sync process does not depend on it — unlike D·NOTE’s “no recording without binding”.
     static var bondIDLength: Int? { nil }
 
     /// Always `nil`, meaning **“this protocol has no encryption, no key required”**.
@@ -2654,27 +2351,6 @@ enum TicNoteTextPayload {
 
 // MARK: - Frame encoding/decoding
 
-/// TicNote frame format — **confirmed**, two independent evidence chains corroborate each other:
-///
-/// 1. **Send side**: the 20 constructors of `WatchAudioCommand` all start with a literal
-///    `[0x02, cmd, 0x00, …]` (extracted byte‑by‑byte from blutter disassembly).
-///    and `WatchAudioService._sendCommand()` **does no wrapping** — it converts the constructor’s
-///    returned `List<int>` directly into a `Uint8List` for `sendPlugin`.
-/// 2. **Receive side**: `WatchAudioParser.parse()` first rejects when `data.length < 3`,
-///    then `_readShort()` (**little‑endian** uint16) reads the command code.
-///
-/// So the on‑line format is:
-/// ```
-/// [type u8][cmd u16 LE][payload …]
-/// ```
-/// **No length prefix, no CRC** — because **a single GATT notify is exactly one whole frame**,
-/// frame boundary = notify boundary (evidence: in `_handleClipDeviceData()`
-/// `extractBytes(event) → parse(bytes)`, `parse` is called only once, with no loop outside).
-///
-/// ⚠️ This is the part of the protocol most prone to mistakes: **do not** implement "circular buffer + length‑based framing".
-/// Treat each received notify as a single frame passed to `decode()`.
-/// The only fallback scenario: if a frame exceeds the payload of a single notify (e.g., large audio chunk and MTU not negotiated),
-/// then accumulate to the "expected byte count" to complete it — the official App does not do this.
 struct TicNoteFrameCodec: RecorderFrameCodec {
 
     // MARK: Encoding (App → Card)

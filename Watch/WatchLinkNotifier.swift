@@ -4,29 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.watch", category: "notifier")
 
-/// 与 iPhone 断开时的**系统通知**（★ 2026-11-03）。
-///
-/// 用户原话："手表如果断开了，需要通知栏弹出，然后点击自动重连或者不点击也可以，增加重连机制。"
-///
-/// ## 和 `WatchRecorderModel.linkLost` 的分工
-/// `linkLost` 是**应用内**的 alert：用户正看着表时立刻告诉他。它依赖 App 活着
-/// （`Task.sleep` 到点才弹），一旦 watchOS 把 App 挂起就什么都不发生。
-/// 这里是**系统通知**：交给 SpringBoard 投递，App 被挂起、屏幕已熄、抬腕不进
-/// App 都能出现在通知中心——这正是"断开了要弹出"的真实场景。
-///
-/// ## 为什么会「先预约、后撤销」，而不是「等确认了再发」
-/// 掉线要持续 `grace` 秒才算真断联（手机锁屏会让 `isReachable` 瞬间变 false，
-/// 见 `WatchLink.phoneReachable` 的注释）。如果用 `Task.sleep` 去等这 20 秒，
-/// 等的时候 App 正好被挂起——通知就永远不会出现，而断联最可能发生的时刻恰恰
-/// 就是"用户把手机放下、表盘熄了"的那段时间。
-///
-/// 所以：掉线的那一刻就把通知**按 20 秒后的时间点预约**到系统，恢复可达时再撤销。
-/// 预约交给系统计时，App 睡不睡都不影响；撤销只是"狼来了"的解药。
-///
-/// ## 授权时机
-/// 不在启动时弹系统框——用户不知道为什么。`requestAuthorizationIfNeeded()` 由
-/// **第一次开始录音**时调用，上下文自明（"录音时要提醒我断联"）。被拒绝了也不影响
-/// 录音与传输，只是少了这条通知。
 @MainActor
 final class WatchLinkNotifier: NSObject, ObservableObject {
     static let shared = WatchLinkNotifier()

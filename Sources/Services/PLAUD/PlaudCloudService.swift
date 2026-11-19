@@ -3,26 +3,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "plaud.cloud")
 
-/// PLAUD consumer-account cloud sync — pulls **original audio** (Opus) from the
-/// recordings the official app uploaded, so the user keeps using the official
-/// PLAUD app untouched while Nomily re-transcribes with its own ASR/LLM keys.
-///
-/// ★ 2026-10-21, user's decision: dual-mode coexistence. This service is the
-/// **cloud mode** (BLE-free, zero impact on the official app). The SDK takeover
-/// mode is a later addition behind the same settings page.
-///
-/// ## Endpoint map (verified against Riffado's working sync code, AGPL — we
-/// re-implemented, no code copied):
-///   · `POST {api}/auth/otp-send-code` `{username}` → `data.token`
-///     (region redirect: `status:-302` + `data.domains.api`, e.g. → api.plaud.cn; follow up to 3×)
-///   · `POST {api}/auth/otp-login` `{code, token}` → `access_token`
-///   · `GET /user/me` — account sanity check
-///   · `GET /file/simple/web?skip&limit&is_trash&sort_by&is_desc` — recording list
-///   · `GET /file/temp-url/{id}?is_opus=1` → presigned `temp_url_opus` (Opus) / `temp_url` (mp3)
-///
-/// ⚠️ Requests must carry a browser-like User-Agent or the edge rejects them.
-/// ⚠️ Never request transcript/summary content here: Nomily's policy is
-/// "audio in, our own keys transcribe" — the official AI output stays untouched.
 @MainActor
 final class PlaudCloudService: ObservableObject {
     static let shared = PlaudCloudService()

@@ -4,32 +4,6 @@ import os.log
 
 private let log = Logger(subsystem: "com.nomily.app.ios", category: "wifi.ticnote")
 
-// MARK: - TicNote Wi-Fi fast-transfer transport layer
-//
-// ## Why this layer looks the way it does
-// In round 7 we assumed "we connect to the card's 8081". **That is backwards** (see the top of `TicNoteWifiProtocol.swift` for the evidence):
-// the phone is the WebSocket **server** and the card connects in. This direction determines the shape of this file:
-//
-//   · Can't use `URLSessionWebSocketTask` (it can only connect outward) → listen ourselves with `NWListener`;
-//   · The handshake and framing must be written by hand → already moved down into `Sources/Services/Net/WebSocketFraming.swift`
-//     (pure bytes, self-checkable on the command line, including the public RFC 6455 test vectors);
-//   · The protocol state machine is also written by hand → already moved down into `TicNoteWifiSession.swift` (pure logic);
-//   · **All that remains is glue**: start the listener / join the hotspot / make the card turn on Wi-Fi / the send-receive loop / timeouts / teardown.
-//
-// ## One complete fast transfer (order after round 15's real-device verification with the official App)
-// ```
-// 1. Start the listener (8081)                        ← must come first, otherwise nobody accepts when the card connects
-// 2. BLE sends the binding frame + OPEN_WIFI (01 0A 00)   ← the binding frame is a precondition, see TicNoteLink.sendOpenWifi()
-// 3. Compute hotspot credentials (not "wait for BLE to push them"!)         ← SSID = "TicNote-"+last 4 of SN; password = last 8 of SN
-// 4. Wait for the card to bring up its hotspot, then join with NEHotspotConfiguration ← see joinHotspotAndAwaitCard()
-// 5. Wait for the card to connect in + send SAY_HELLO (cmder 2)    ← the phone is the server, the card connects actively
-// 6. State machine: handshake → request list → request file → receive chunks
-// 7. Teardown: WIFI_CLOSE (cmder 4) + drop the hotspot + stop the listener
-// ```
-// Step 3 was once treated as "the only hard gap" —— because we assumed the card would report the password over BLE, yet the card stops BLE advertising
-// entirely as soon as it opens its hotspot, which looked like a deadlock. **The on-device logcat of the official App in round 15 resolved it**:
-// the official original `Received WIFI info: {ssid: TicNote-3N9H, passwd: Y36W3N9H}`, and this card's SN is
-// `S02510YCY36W3N9H` —— both values are slices of the SN. **No frame capture needed.** See `protocol-notes.md` §18.
 
 @MainActor
 final class TicNoteWifiLink: RecorderFastTransfer {

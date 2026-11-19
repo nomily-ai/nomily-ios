@@ -16,7 +16,6 @@ struct ScannerSheet: View {
     enum AddCategory: String, CaseIterable, Identifiable {
         case vobot
         case ticnote
-        case dingtalkA1
         case soundcore
         case appleWatch
 
@@ -26,7 +25,6 @@ struct ScannerSheet: View {
             switch self {
             case .vobot: return L10n.Scanner.categoryVobot
             case .ticnote: return L10n.Scanner.categoryTicnote
-            case .dingtalkA1: return L10n.Scanner.categoryA1
             // ★ 飞书录音豆（soundcore Work D3200）——与飞书 App 并行使用，
             //   App 端不做绑定（红线），仅控制/拉取录音。
             case .soundcore: return L10n.Scanner.categorySoundcore
@@ -36,7 +34,7 @@ struct ScannerSheet: View {
 
         var subtitle: String {
             switch self {
-            case .vobot, .ticnote, .dingtalkA1, .soundcore: return L10n.Scanner.actionScan
+            case .vobot, .ticnote, .soundcore: return L10n.Scanner.actionScan
             case .appleWatch: return L10n.Scanner.actionWatch
             }
         }
@@ -45,7 +43,6 @@ struct ScannerSheet: View {
             switch self {
             case .vobot: return "hifispeaker.2"
             case .ticnote: return "waveform.circle"
-            case .dingtalkA1: return "key.horizontal"
             case .soundcore: return "mic.circle"
             case .appleWatch: return "applewatch"
             }
@@ -194,7 +191,6 @@ struct ScannerSheet: View {
     private var filteredRecorders: [DiscoveredRecorder] {
         switch category {
         case .ticnote: return newRecorders.filter { $0.protocolID == "ticnote" }
-        case .dingtalkA1: return newRecorders.filter { $0.protocolID == "dingtalk-a1" }
         case .soundcore: return newRecorders.filter { $0.protocolID == SoundcoreRecorderSpec.identifier }
         default: return []
         }

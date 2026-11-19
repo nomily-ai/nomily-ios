@@ -88,20 +88,6 @@ struct AppConfig: Codable, Equatable {
     /// and importing the UI layer's `AppTheme` (which needs SwiftUI's `Color`) here would drag SwiftUI
     /// into every target that only wants to read settings.
     var appTheme: String?
-    /// The command the DingTalk A1 setup page shows for "run this on your Mac".
-    ///
-    /// **Machine-specific by nature** (the extractor script lives wherever the user put it), so
-    /// it is user-editable and persisted; `nil` = the generic default the setup page renders.
-    /// Never assume *our* path here — a build handed to someone else must not carry it.
-    var a1ExtractCommand: String?
-    /// The DingTalk A1 **recording mode** the user picked (`A1RecordMode.rawValue`).
-    ///
-    /// ★ (2026-10-19) Mirrors the card's five modes shown in DingTalk's device settings
-    /// (General / Meeting / Face-to-face / AI Visual Notes / Lossless). Persisted per app because `0x0100`
-    /// currently exposes **no** record-mode param — until the real key is confirmed from a
-    /// live `dumpAllParams()` log, the choice is a named preset the app documents (and later
-    /// applies once the key is known). `nil` = `.general` (the card's default).
-    var a1RecordMode: String?
     /// Which expression the watch home-screen face shows — `BotFaceStyle.rawValue`.
     ///
     /// **`nil` = never chosen**, equivalent to `calm` (what the face looked like before the thirteenth revision).
@@ -189,8 +175,6 @@ struct AppConfig: Codable, Equatable {
         case lastSummaryLang = "last_summary_lang"
         case appLanguage = "app_language"
         case appTheme = "app_theme"
-        case a1ExtractCommand = "a1_extract_command"
-        case a1RecordMode = "a1_record_mode"
         case watchFaceStyle = "watch_face_style"
         case watchEyeColor = "watch_eye_color"
         case watchBlinkSpeed = "watch_blink_speed"
@@ -262,8 +246,6 @@ struct AppConfig: Codable, Equatable {
         self.lastSummaryLang = try c.decodeIfPresent(String.self, forKey: .lastSummaryLang)
         self.appLanguage = try c.decodeIfPresent(String.self, forKey: .appLanguage)
         self.appTheme = try c.decodeIfPresent(String.self, forKey: .appTheme)
-        self.a1ExtractCommand = try c.decodeIfPresent(String.self, forKey: .a1ExtractCommand)
-        self.a1RecordMode = try c.decodeIfPresent(String.self, forKey: .a1RecordMode)
         self.watchFaceStyle = try c.decodeIfPresent(String.self, forKey: .watchFaceStyle)
         self.fastTransferThresholdKB = try c.decodeIfPresent(Int.self, forKey: .fastTransferThresholdKB) ?? 512
         self.remindersSyncEnabled = try c.decodeIfPresent(Bool.self, forKey: .remindersSyncEnabled) ?? false
@@ -314,8 +296,6 @@ struct AppConfig: Codable, Equatable {
         lastSummaryLang: String? = nil,
         appLanguage: String? = nil,
         appTheme: String? = nil,
-        a1ExtractCommand: String? = nil,
-        a1RecordMode: String? = nil,
         watchFaceStyle: String? = nil,
         watchEyeColor: String? = nil,
         watchBlinkSpeed: String? = nil,
@@ -361,8 +341,6 @@ struct AppConfig: Codable, Equatable {
         self.lastSummaryLang = lastSummaryLang
         self.appLanguage = appLanguage
         self.appTheme = appTheme
-        self.a1ExtractCommand = a1ExtractCommand
-        self.a1RecordMode = a1RecordMode
         self.watchFaceStyle = watchFaceStyle
         self.watchEyeColor = watchEyeColor
         self.watchBlinkSpeed = watchBlinkSpeed

@@ -32,7 +32,7 @@ enum ClipArtefact {
     /// sidecar and a lone `.title` would resurrect a ghost clip.
     static let titleSuffix = ".title"
 
-    /// "Mark" dots dropped by a recorder card mid-recording (`A1MarkStore`).
+    /// "Mark" dots dropped by a recorder card mid-recording (`RecorderMarkStore`).
     ///
     /// Also metadata rather than one of the three artefacts: it belongs to the **audio**, and it is
     /// never shown on its own. Deliberately not classified as `.audio` — `ClipTrash.restore` picks the

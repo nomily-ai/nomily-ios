@@ -32,9 +32,8 @@ struct RecorderAdvertisement: Equatable {
     let raw: [String: AnyHashable]
 
     var displayName: String {
-        // `modelName` may be empty (the DingTalk A1 has no model string — its "model" is the
-        // serial tail, which the subtitle lines already show). Guard the join so we never
-        // render a trailing space like "DingTalk A1 ".
+        // `modelName` may be empty. Guard the join so we never
+        // render a trailing space.
         modelName.isEmpty ? family : "\(family) \(modelName)"
     }
 
@@ -365,7 +364,6 @@ enum RecorderProtocolRegistry {
     static let all: [any RecorderProtocolSpec.Type] = [
         DnoteRecorderSpec.self,
         TicNoteRecorderSpec.self,
-        DingTalkA1Spec.self,
         // ★ soundcore Work D3200（飞书录音豆）— BLE 控制通道与 TicNote 同构
         //   （08EE/09FF 帧 + ECDH 会话加密文件），走同一套 RecorderLink 抽象。
         SoundcoreRecorderSpec.self,

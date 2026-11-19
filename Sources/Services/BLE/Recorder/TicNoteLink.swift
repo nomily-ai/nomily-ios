@@ -38,14 +38,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
     let peripheral: CBPeripheral
     private weak var central: CBCentralManager?
 
-    /// Card SN (the ASCII segment in advertising manufacturer data, e.g., `S02510YCY36W3N9H`).
-    ///
-    /// **This is the sole source of fast-transfer credentials**: hotspot name = `"TicNote-" + last 4 digits of SN`,
-    /// WPA2 password = last 8 digits of SN (verified on real device by official app, see `TicNoteWifiCredentials.from(sn:)`
-    /// as in `protocol-notes.md` §18.1). Without SN, fast transfer is unavailable — see `fastTransfer`.
-    ///
-    /// Provided by `BluetoothCoordinator` from scan results when establishing the link. The only way it can be `nil`
-    /// is when advertising lacks manufacturer data (e.g., peripherals obtained via `retrievePeripherals` without a full scan).
     private(set) var serialNumber: String?
 
     /// Write characteristic (App → Card): `00002bb1-…`. Reusing DnoteClient's `rx/tx` naming can be confusing,
@@ -181,12 +173,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
     /// (see `runExclusive`), blind periodic sending would just contend for the lock with legitimate work.
     private var lastActivityAt = Date()
 
-    /// Send a heartbeat after each period of inactivity.
-    ///
-    /// The 20 s basis: the official app speaks at 1 Hz during **recording** (`0x1C` pull-stream + 1 Hz status),
-    /// but it does not keep alive periodically when idle — thus the firmware’s self-disconnect timeout **has no measured value**.
-    /// 20 s is clearly shorter than the "user perceives disconnection" threshold, yet 20× less frequent than 1 Hz polling;
-    /// To adjust, change this single constant. **Do not** set it to 1 s — that would turn it into a continuous stream.
     static let keepAliveIdleInterval: TimeInterval = 20
 
     /// Minimum heartbeat interval (must be at least this long between heartbeats to prevent `lastActivityAt` from
@@ -195,47 +181,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
 
     // MARK: Voice stream — ★ The only **continuous** "card recording" signal
 
-    /// The card is pushing the Opus payload for this recording.
-    ///
-    /// ## Basis (`bug2-20261008.att.txt`, the 72-second real recording segment)
-    /// The previous version claimed "the card is silent during recording", which was derived from statistics on **control frames** —
-    /// After including `0x02` voice frames, the reality is the opposite:
-    ///
-    /// ```
-    ///   · 7,398 `0x02` voice frames, each **exactly 90 bytes** = MTU 93 − 3;
-    ///   · Layout [0x02][sid u32][offset u32][len u8][80 B Opus payload],
-    ///     adjacent frame offsets step by **80**, strictly consecutive with no overlap;
-    ///   · Frame rate **~100 fps** (stable 1050 frames in a 10-second bucket);
-    ///   · **7,044 × 80 = 563,520 B exactly matches** the fileSize reported by 0x17;
-    ///   · The **start/end boundaries of the frame stream exactly align** with the recording window:
-    ///     t<5774 contains only a few frames, 5774–5846 maintains 1050 frames per 10 s, then drops to zero after 5846.
-    /// ```
-    ///
-    /// ## Therefore, "whether there are voice frames in the last 1.2 s" indicates "if the card is currently recording"
-    /// Much more reliable than `0x14`/`0x17` (those two are one-shot, pushing only four frames total).
-    ///
-    /// ## ⛔⛔ **However, this signal alone is insufficient — real-device testing on 2026-10-10 invalidated half the assumptions**
-    /// The above statement "no polling needed: the card pushes on its own" is **incorrect**.
-    /// In round 19, after starting recording with `tools/bleprobe rec`, **silently observe for 8 seconds**, the result is
-    /// **0 spontaneous voice frames**; however, in the same round when we actively sent a `0x1C` fragment request, the card immediately responded with
-    /// `01 1c 00 <u32 sid> <u8 status>` (we just guessed the wrong sid at the time, so no payload was retrieved).
-    /// Retrospectively, the 72-second recording for `bug2` matches: the official app sent **351 `0x1C` requests** throughout the recording.
-    /// — the voice stream is **pulled**, not pushed (see §20.7).
-    ///
-    /// **Consequence (this is the bug I introduced in the previous version)**: `streamingVoice` in
-    /// the "recording page open, no active pull" scenario **never becomes `true`** —
-    /// resulting in a dark red dot, stopwatch stuck at 0:00, while the card is actually recording.
-    /// The true criterion now resides in the second entry of `pushedRecordingState` (`0x18` recording status report)
-    /// plus the 1 Hz `0x1A` refresh in `readRecordingStatus`.
-    /// **`streamingVoice` is downgraded to "nice-to-have"**: it is true only when we are actually pulling data.
-    ///
-    /// ## ⚠️ Intentionally implemented as a **computed property**, not a stored `@Published` property
-    /// Two reasons, both based on past pitfalls:
-    ///   * When the card stops recording, **no frames arrive**, so a "saved true" never gets overridden
-    ///     (the `refreshVoiceLiveness` version required the caller to refresh — forgetting once locks it permanently);
-    ///   * During recording the frame rate is ~100 Hz; publishing per frame would rebuild the UI 100 times per second.
-    /// A computed property yields fresh data on each read with zero notifications, matching its consumers perfectly
-    /// (`RecorderSessionModel.cardWatchTask` at 1 Hz, `startRecording` verification loop at 10 Hz).
     var streamingVoice: Bool {
         guard let last = lastVoiceFrameAt else { return false }
         return Date().timeIntervalSince(last) <= Self.voiceLivenessWindow
@@ -992,67 +937,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
 
     // MARK: RecorderLink – List recordings
 
-    /// List recordings.
-    ///
-    /// Real-device exchange: `01 1A 00 <u32 flag> <u32 since> <u8>` → card response
-    /// `01 1A 00 <u32 flag> <u32 count> count × [u32 startSec][u32 byteCount][u16 type]`.
-    ///
-    /// Sending **0** for `since`: the official app sends a fixed early timestamp
-    /// (`0x69D9EAF5` = 2026-04-11, while all 5 recordings on the card are after 2026-07),
-    /// It serves to “only include recordings after this time”. Sending 0 means **full set**.
-    /// ⚠️ Do not send “current device time − N days”: the card’s RTC is about six months behind real time
-    /// (this is why `0x04` time-sync is required); otherwise **all** recordings get filtered out.
-    ///
-    /// ## ★★★ 2026-10-10 Real-device decision: **send an opening handshake before listing files**
-    ///
-    /// This is the root cause of “Device did not answer in time **continuously**”, discovered empirically, not guessed.
-    ///
-    /// Real-device log (`/tmp/t3.log`, the **fresh connection** at 16:36:00):
-    ///
-    /// ```
-    ///   16:36:00.656 LINK GATT handshake completed            ← just connected
-    ///   16:36:00.728 → 0x1A flag=1                 ┐
-    ///   16:36:05.961 → 0x1A flag=2                 │ three zero-response sends,
-    ///   16:36:11.212 → 0x1A flag=3                 ┘ each waited full 5 s before giving up
-    ///   16:36:22.156 ← 0x14 (card finally responds)
-    ///   16:36:23.741 PROV opening handshake start force=false    ← ★ first opening handshake sent here
-    ///   16:36:23.957 → binding frame
-    ///   16:36:24.162 → 0x1A flag=1                 → card replies immediately per entry
-    /// ```
-    ///
-    /// The three 15 s “card ignores us” periods **all occurred before the opening handshake**.
-    /// Previously the handshake was sent only via two paths: before recording starts (`force: true`) and in the 1 Hz poll
-    /// (`readRecordingStatus` → `provisionSession(force: false)`) – the latter
-    /// **runs only when `isRecording == true`**. Thus in the "just connected, recording not started" scenario
-    /// the most common case, the handshake **has never been sent**, and the first task on this page is precisely to list recordings.
-    ///
-    /// Therefore we now place the handshake **at the start of this method**, together with `fetchRecording`'s
-    /// `0x1D` pre-step, same idea: **if the card hasn't been formally introduced on this connection, introduce it once first.**
-    /// - `force: false` → skip if already sent on this connection, so it **does not** write two frames for every listing.
-    ///   Normally only the first round of the current connection is actually sent;
-    /// - After sending, must `inbox.drain()`: the handshake makes the card **dump a complete list along with it**
-    ///   (real device 16:36:23.99 → 9 `0x1A` notifications); if not cleared, they mix with the one we're waiting for.
-    ///
-    /// ## Self-healing retry round
-    ///
-    /// Even if the handshake wasn't missed, the card may still go silent — on the real device, after sending `01 1E 00 <sid> 00` once at 16:40:46
-    /// (delete), **none of the subsequent 4 `0x1A` got any reply** (while at the same time `0x09` kept replying,
-    /// showing the card was alive, just refusing to list files):
-    ///
-    /// ```
-    ///   16:40:46.272 → WC 01 1E 00 CF F9 C9 6A 00     ← delete
-    ///   16:40:46.273 → WC 01 1A 00 12 …                ← zero reply
-    ///   16:40:57.029 → WC 01 1A 00 13 …                ← zero reply
-    ///   16:41:07.643 → WC 01 1A 00 14 …                ← zero reply
-    ///   16:41:15.406 → WC 01 1A 00 15 …                ← zero reply
-    ///   (meanwhile 16:41:08.507 ← 0x0B / 16:41:08.508 ← 0x09 were normal)
-    /// ```
-    ///
-    /// This is externally identical to the "stale handshake" symptom (frame bytes all correct, yet the card stays silent),
-    /// so the remedy follows the `fetchRecording` one: **do a full handshake again (`force: true`), then list one more round**.
-    ///
-    /// ⚠️ Retry only **one round**: when the card is truly dead, retrying just turns the 8 s budget into 16 s,
-    /// which isn't self-healing. Failures are thrown as-is, and the UI displays the reason.
     func listRecordings() async throws -> [RecorderRecording] {
         try await runExclusive {
             guard self.isConnected else {
@@ -1462,13 +1346,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
             // and raising an error would only block the one useful step. On failure, just log.
             await stopSynchronization()
 
-            // ★ Step 2: read 0x08 general settings to get `rec_scene` (the official beginRec's 2nd call).
-            //
-            // ⚠️ Key difference from the previous version: **a failed read no longer aborts the recording start**.
-            //   The previous version did `throw .timeout` right away when no response arrived — the result was "if the card was a bit slower,
-            //   not a single record-start frame could be sent", yet whether the card answers 0x08 has no causal link to whether it can accept a record-start frame
-            //   (the official app just "reads it in passing"; our fallback scene value
-            //   is confirmed as 2 both in real-device logs and in the 0x08 response). So downgrade to "recording the source".
             inbox.drain()
             try write(TicNoteFrameCodec.frame(
                 rawCmd: TicNoteObservedCommand.getConfig.rawValue,
@@ -1577,17 +1454,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
         }
     }
 
-    /// Instruct the card to stop recording.
-    ///
-    /// ⚠️ The previous version claimed the online frame was "confirmed by real-device ATT capture" — **inaccurate**. In the capture
-    /// **there is no `0x17` from App→card** (checked across 10 full captures: outbound only contains
-    /// `01 03 04 06 08 09 0C 1A 1C 1D`), because the official App's start/stop recording actions were never captured.
-    /// The real basis is disassembly + full-table calibration: the list for `WriteCmd::recordEnd` is
-    /// `[0x02, 0x2E, 0x00]` (Smi marker) → `>>1` → **`01 17 00`**;
-    /// All 10 known commands in the same table, after `>>1`, match the capture byte-by-byte (see `TicNoteCommand` comment).
-    ///
-    /// After sending, record a `stopRequestedAt`: the card **does not guarantee** a `0x17` response, relying only on the earlier
-    /// `0x14` which keeps the status showing "recording" (red dot stays on, timer continues).
     func stopRecording() async throws {
         let frame = TicNoteFrameCodec.recordStopFrame
         try await runExclusive {
@@ -1767,34 +1633,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
 
     // MARK: RecorderLink — microphone gain (the official “Microphone Gain” item)
 
-    /// Set the card's microphone gain — using the **write** direction of `0x08`:
-    ///
-    /// ```
-    /// 01 08 00 | 02 <rec_led_status> <rec_scene> <rec_mode> <row_data> <micCode>
-    /// ```
-    ///
-    /// Byte-by-byte derivation can be found in `TicNoteGeneralSetting.writePayload` and `TicNoteMicrophoneGain`
-    /// (two levels: official UI `24 db` = `0xD6`, `36 db` = `0xFE`).
-    ///
-    /// ## Why the current settings must be read before writing
-    /// This frame is not a “new setting”, but **the current settings on the card with the gain slot replaced**.
-    /// If you construct it with default values, you inadvertently change the user's recording scene / indicator light to our guessed values
-    /// (the real device now is `led=0, scene=2, mode=0, row_data=1`; guessing wrong means **modifying the user's card**).
-    /// Therefore:
-    /// * If `lastGeneralSetting` is unavailable → read a `0x08` first;
-    /// * If still unreadable → **throw an error, send nothing**.
-    ///
-    /// ## Why a `0x08` response from the card indicates success
-    /// The official logic does this: `changeVolume` registers a callback on `reviceApi.on("8")`,
-    /// and that callback **shows “Settings saved` (`myDevice_setdbsucc`) and dismisses the overlay**
-    /// — meaning the official side also waits for the card’s reply to consider the write successful.
-    /// If no response is received = the card didn’t acknowledge, throw `.timeout` so the UI reports it truthfully (**no fake success**).
-    ///
-    /// ## ⚠️ Consequence note (written in the implementation to prevent future assumptions of a bug)
-    /// After writing, **reading back `0x08` cannot verify the gain**: the card reports the 5th byte (`dmic_mode`)
-    /// on the real device as `0x7F`, which is unrelated to `0xD6`/`0xFE` (the official app also falls back to index 0 on this card).
-    /// Therefore updating `lastGeneralSetting` here only refreshes the “other four fields” to match the card’s report,
-    /// the UI does not promise a “read-back confirmation”.
     func setMicrophoneGain(_ gain: TicNoteMicrophoneGain) async throws {
         try await runExclusive {
             guard isConnected else { throw RecorderLinkError.notConnected }
@@ -2111,18 +1949,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
 
     // MARK: RecorderLink — Wi-Fi high-speed channel
 
-    /// Wi-Fi high-speed channel. **Credentials are derived locally from the SN; the card does not need to report anything.**
-    ///
-    /// ⚠️ Here **not** "return a channel if connection succeeds", but "return nil if credentials cannot be computed":
-    /// Returning a channel without an SSID will cause the user to wait 20 seconds after selecting Wi-Fi before timing out,
-    /// then receive a "connection timeout"— that error is unrelated to the actual cause (missing SN).
-    /// The card's most recent self-reported recording session ID (present in `0x14`/`0x17`/`0x18`).
-    ///
-    /// ★ This is the **full 32-bit** sid — on a real device: `0x14` reports `77 43 C7 6A`,
-    /// The official app's subsequent `0x1C` request uses exactly these four bytes (`captures/bug2-20261008.att.txt`
-    /// lines 38087 / 38103). The value in `0x18` was once recorded as "truncated to 26 bits"
-    /// (§21.4), **do not use it to fetch files** — that `0x1C` failure (status 0x02)
-    /// was likely caused by using the truncated value.
     var lastSessionID: UInt32? { lastSessionNotice?.sessionID }
 
     var fastTransfer: (any RecorderFastTransfer)? {
@@ -2130,17 +1956,6 @@ final class TicNoteLink: NSObject, ObservableObject, RecorderLink {
         return TicNoteWifiLink(ble: self, credentials: credentials)
     }
 
-    /// Credentials for fast transfer. Retrieval **prefers the card-reported value, falling back to SN-derived**:
-    ///
-    ///   1. `wifiCredentials` — value actively reported by the card over BLE (almost always nil on real devices,
-    ///      retained for cross-validation when firmware rules change);
-    ///   2. `serialNumber` — **default path**. `TicNoteWifiCredentials.from(sn:)`
-    ///      directly computes `SSID = "TicNote-" + last 4 digits of SN`, `password = last 8 digits of SN`
-    ///      (confirmed by official app logcat on real device, `protocol-notes.md` §18.1).
-    ///
-    /// Both unavailable yields `nil` (fast transfer unavailable). This block is extracted because
-    /// `fastTransfer` and `fastTransferUnavailableReason` must use **the same criterion**—
-    /// duplicating the logic on both sides inevitably leads to "button lit but times out immediately".
     private var fastTransferCredentials: TicNoteWifiCredentials? {
         if let reported = wifiCredentials { return reported }
         guard let sn = serialNumber else { return nil }
@@ -2312,46 +2127,6 @@ extension TicNoteLink: CBPeripheralDelegate {
     }
 }
 
-// MARK: - LiveAudioSource (real-time transcription: pull while recording)
-//
-// ## Why this section is in this file instead of a new `TicNoteLiveSource.swift`
-// The lockstep loop must **directly consume** `inbox` (via `nextFrame`) and **directly write** GATT (via `write`),
-// Both are `private`, and Swift's `private` is **file-level** scope —
-// Moving to another file would cause a compile error. Extracting it would require relaxing the single-consumer constraint on `inbox` to `internal`,
-// which is the only guarantee that "list / download / read-status" do not compete for frames (already caused a false timeout on real hardware
-// due to frame contention). **Not worth sacrificing file line count.**
-//
-// ## How this path was decided
-// Real-time transcription needs to capture audio while the device is **still recording**; TicNote firmware has two possible paths:
-//
-// | Path | Basis | Conclusion |
-// |---|---|---|
-// | `0x03` real-time audio stream | In 13 captures, `0x03` frame count is **all zero**; the two official parsers contradict each other | Discard |
-// | **Pull while recording** (`0x1C` chunked polling of growing file) | The official app does this throughout recording | **Take this path** |
-//
-// Full capture is in `captures/hci-all/bug2-20261008.att.txt` session `0x6AC74377` (72.15 s):
-//
-// ```
-//   0x14 (session start, with full sid)        5774.351
-//   0x1D → 0x1E (prelude)                5774.368 → 5774.492
-//   0x1C × 353                         5774.713 → 5848.276
-//     start strictly consecutive 0 → 1600 → … → 563520 (last chunk 320 B)
-//   0x17 (session end, fileSize=563520)   5846.503
-// ```
-//
-// ★ The most important point: **the card throttles itself in real time**. In steady state, every 25 chunks take exactly 5.0 s = 5 chunks/s,
-// and each chunk 1600 B = 0.2 s of audio — exactly 1 second of audio per second. The first 25 chunks are faster than real time
-// (the card is filling the unwritten beginning part), indicating **the card waits until it finishes writing before sending**.
-// Hence the algorithm can be simple enough to not need to ask "how much has been written now":
-//
-// ```
-//   Request [pulled, pulled+1600) → wait for 20 0x02 packets → wait for chunk tail → pulled += 1600 → request again
-// ```
-//
-// ## Two lines you must not cross
-// 1. **Must stay in lockstep**: the card's firmware only accepts a single in-flight command; premature sends are dropped or return a non-zero status.
-// 2. **`0x1D` is not an optional optimization**: it is the switch that "makes the card respond with `0x1C`" (without it, real device
-//    0 frames within 60 s). Moreover, it must **immediately follow a complete opening sequence** to receive `0x1E`.
 extension TicNoteLink: LiveAudioSource {
 
     // MARK: Identity / Capability

@@ -1043,7 +1043,6 @@
 "ticnote.unbind" = "Unbind this card";
 "ticnote.unbind_confirm_title" = "Unbind this card?";
 "ticnote.unbind_confirm_message" = "The card is released so it can be paired again, and this app forgets it. Recordings on the card are not deleted — transfer them first if you want to keep them.";
-"ticnote.unbind_confirm_message_a1" = "This removes the card from Nomily — its key, name and ledger entry — and disconnects it. The card keeps its recordings, and the binding inside your DingTalk account can only be removed in the official DingTalk app.";
 "ticnote.unbind_confirm_action" = "Unbind";
 "ticnote.unbinding" = "Unbinding…";
 "ticnote.unbind_success" = "Unbound. The card has been removed from this app.";
@@ -1273,42 +1272,7 @@
 "theme.amber" = "Amber";
 "theme.amber.subtitle" = "Warm, low glare";
 
-// MARK: - DingTalk A1 credential import (2026-10-18)
-"a1.title" = "DingTalk A1";
-"a1.intro" = "Every DingTalk A1 has its own device secret. DingTalk issues it when the card is bound to an account; it can't be derived from the serial number and it is never sent over Bluetooth. So the first time, it has to be taken out of one signed-in DingTalk session — after that, listing, downloading and transcribing all happen offline, with no DingTalk involved.";
-"a1.step1.title" = "Bind the card to your DingTalk account";
-"a1.step1.body" = "Bought it second-hand? Ask the seller to unbind it first, then scan the code in DingTalk to bind it yourself. Only you can do this step — it decides which account the card hands its secret to.";
-"a1.step2.title" = "Open “AI Notes” once on the desktop app";
-"a1.step2.body" = "Any template will do. DingTalk writes the device list — secret included — into its own log on that computer.";
-"a1.open_import" = "Import this card's key";
-"a1.error.no_credential" = "This card has no key on this phone yet. Open this card's info page → “Card key” to scan or paste it — a one-time step, after which everything runs offline.";
-"a1.error.rejected" = "The card rejected the stored credential (501). Each card's secret works only on that card — import this card's own credential in Settings → DingTalk A1.";
-"a1.error.not_authenticated" = "The card says this session isn't authenticated (405). Disconnect and reconnect the card, then try again.";
-"a1.error.bad_secret" = "The stored credential's secret is too short to produce a token. Re-import it in Settings → DingTalk A1.";
-"a1.paste.section" = "Paste the credential";
-"a1.paste.placeholder" = "Paste what the command copied…";
-"a1.paste.from_clipboard" = "Paste";
-"a1.import" = "Import";
-"a1.paste.footer" = "Accepts a scanned QR code, the one-line link, the JSON the extractor writes, or key=value lines.";
-"a1.imported.header" = "Imported";
-"a1.imported.ok" = "Ready — reconnect the card to use it";
-"a1.card.name" = "Card";
-"a1.card.sn" = "Serial";
-"a1.card.secret" = "Secret";
-"a1.cards.header" = "Cards on this phone";
-"a1.cards.footer" = "The secret is kept in the iOS keychain only — never in the settings file, never uploaded anywhere. Swipe a card to remove it; the card itself is untouched.";
-"a1.delete.title" = "Remove this card's credential?";
-"a1.delete.message" = "Nomily will no longer be able to read this card. Recordings on the card are not affected.";
-"a1.import_failed" = "Couldn't import that";
 
-/* ---- DingTalk A1: QR / deep-link import ---- */
-"a1.scan.action" = "Scan QR code";
-"a1.scan.hint" = "Point the camera at the QR code the command printed on your Mac.";
-"a1.scan.denied" = "Camera access is off for Nomily. Turn it on in Settings → Nomily AI → Camera, or paste the line instead.";
-"a1.scan.no_camera" = "No camera available here.";
-"a1.scan.failed" = "That QR code isn't a DingTalk A1 credential. Use the one printed by the extractor on your Mac.";
-"a1.link.imported" = "Credential imported";
-"a1.link.imported_body" = "%@ is ready. Go back and tap “Try again”.";
 
 /* ---- Remark marks dropped on the card while recording ---- */
 "clip_detail.remarks" = "Remarks";
@@ -1317,15 +1281,6 @@
 "clip_detail.remarks_footer" = "Pressed the record key while the card was recording — each press drops a marker there. Tap one to jump to it.";
 
 /* ---- A1: each card's own key (device info page) ---- */
-"a1.section.title" = "Card key";
-"a1.section.footer" = "This key belongs to this card alone — it is not an app-wide setting. Another A1 needs its own. It is stored in the iOS keychain and never leaves the phone.";
-"a1.missing.title" = "No key on this phone yet — the card can't be read until one is imported.";
-"a1.replace" = "Replace key";
-"a1.remove" = "Delete key";
-"a1.paste.manually" = "Paste it instead";
-"a1.how_to" = "How do I get this key?";
-"a1.scoped_to" = "For %@ only";
-"a1.mismatch" = "Saved, but its serial ends in %@ — this card's ends in %@. If you meant this card, import that card's own key.";
 
 "summarize.chip_recommended" = "Recommended";
 "summarize.chip_custom" = "Custom";
@@ -1436,7 +1391,6 @@
 "scanner.pick_hint" = "Pick a device type, then scan for it";
 "scanner.category_vobot" = "V05E";
 "scanner.category_ticnote" = "TicNote";
-"scanner.category_a1" = "DingTalk A1";
 "scanner.category_plaud" = "PLAUD";
 "scanner.category_watch" = "Apple Watch";
 "scanner.action_scan" = "Scan to connect";

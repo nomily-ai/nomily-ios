@@ -407,9 +407,6 @@ struct TodoBoardView: View {
     // MARK: 日历计算
 
     private var weekdaySymbols: [String] {
-        // ★ 2026-11-09（用户截图：英文界面下表头是"日 一 二 …"）：跟随 App 内
-        // 语言覆盖（AppLocale.current），不能跟系统 locale——设备是中文时
-        // 英文界面会漏出中文表头。
         var calendar = Calendar.current
         calendar.locale = AppLocale.current
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
